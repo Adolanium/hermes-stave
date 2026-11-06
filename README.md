@@ -25,7 +25,7 @@
 
 Most music generators hand you a sound file. Stave hands you the score.
 
-Hermes writes the piece as notation, so every note is on the page. You can see why the ending feels finished, hear the cello take the tune, and take the whole thing to GarageBand, MuseScore or a real piano as MIDI. You don't need to read music. The notes light up as they sound, and a line runs along the melody so your eye knows where to look.
+Hermes writes the piece as notation, so every note is on the page. You can see why the ending feels finished, hear the cello take the tune, and take the whole thing to GarageBand or MuseScore as MIDI, or print it for a real piano. You don't need to read music. The notes light up as they sound, and a line runs along the melody so your eye knows where to look.
 
 ## The suite
 
@@ -81,7 +81,7 @@ Every change keeps a snapshot. Undo with the arrow or ⌘Z / Ctrl+Z and you are 
 | **Meters** | 4/4, 3/4, 6/8, 2/4 |
 | **Keys** | C, G, D, A, F, B♭, E♭ major; A, E, B, F♯, D, G, C minor |
 | **Length** | 16 to 32 bars in 2 to 4 sections, longer on request |
-| **Export** | MIDI · WAV · the engraved score as SVG, ready to print · ABC text |
+| **Export** | sheet music as a PDF on A4 pages, ready to print · the score as SVG · MIDI · WAV · ABC text |
 
 ## Rehearsal
 
