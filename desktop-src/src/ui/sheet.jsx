@@ -135,11 +135,13 @@ function rangeBoxes(boxes, from, to) {
   return out
 }
 
-const RENDER_OPTIONS = width => ({
+const RENDER_OPTIONS = (width, tablature) => ({
   add_classes: true,
   staffwidth: Math.max(520, width - 40),
   paddingtop: 52,
-  paddingbottom: 10,
+  // A TAB staff's lowest string carries fret numbers centred on its line; leave room for them.
+  paddingbottom: tablature ? 26 : 10,
+  ...(tablature ? { tablature } : {}),
   paddingleft: 4,
   paddingright: 24,
   wrap: undefined
@@ -156,10 +158,10 @@ function withLayout(abc) {
 }
 
 /**
- * Props: abc, barCount, marks, selection {from,to}|null, busy {from,to}|null, slither {from,to,key}|null,
+ * Props: abc, tablature (abcjs TAB options per voice, or undefined), barCount, marks, selection {from,to}|null, busy {from,to}|null, slither {from,to,key}|null,
  * writing {text}|null, player, onSelect(range|null), onVisual(visual).
  */
-export function Sheet({ abc, barCount, marks, selection, busy, slither, writing, player, onSelect, onVisual }) {
+export function Sheet({ abc, tablature, barCount, marks, selection, busy, slither, writing, player, onSelect, onVisual }) {
   const hostRef = useRef(null)
   const scoreRef = useRef(null)
   const overlayRef = useRef(null)
@@ -186,7 +188,17 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
   useLayoutEffect(() => {
     const target = scoreRef.current
     if (!target || !width || !abc) return
-    const visual = abcjs.renderAbc(target, withLayout(abc), RENDER_OPTIONS(width))[0]
+    let visual
+    try {
+      visual = abcjs.renderAbc(target, withLayout(abc), RENDER_OPTIONS(width, tablature))[0]
+    } catch (error) {
+      // abcjs's TAB code can throw on a chord it cannot place on the strings. The checker keeps such
+      // chords out, but an older piece may still have one: show the notes without TAB rather than
+      // nothing at all.
+      if (!tablature) throw error
+      console.warn('[stave] TAB could not be drawn, showing notes only', error)
+      visual = abcjs.renderAbc(target, withLayout(abc), RENDER_OPTIONS(width))[0]
+    }
     const svg = target.querySelector('svg')
     if (!svg) return
     const layer = document.createElementNS(SVG_NS, 'g')
@@ -219,7 +231,7 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
     setBoxes(barBoxes(svg, hostRef.current, barCount))
     setRenderKey(k => k + 1)
     onVisual?.(visual)
-  }, [abc, width, barCount])
+  }, [abc, width, barCount, JSON.stringify(tablature || null)])
 
   // Notes swim in: every element of the new bars, in reading order, staggered along a wave.
   useLayoutEffect(() => {

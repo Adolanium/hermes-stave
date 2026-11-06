@@ -11,7 +11,7 @@ import json
 import time
 import uuid
 
-from .abc_check import INSTRUMENTS, check_piece
+from .abc_check import FRETTED, INSTRUMENTS, check_piece, clef_for, fold_into_range
 from .inbox import Inbox
 
 TOOLSET = "stave"
@@ -24,7 +24,8 @@ _PIECE_PROPS = {
     "tempo": {"type": "integer", "description": "Quarter notes per minute (dotted quarters for 6/8), 40-200."},
     "voices": {
         "type": "array",
-        "description": "1 to 3 parts; the first is the melody. Ids are V1, V2, V3 in order.",
+        "description": "1 to 3 parts; the first is the melody. Ids are V1, V2, V3 in order. Guitars use the treble "
+                       "clef and bass guitar the bass clef, written an octave above how they sound; the page adds TAB.",
         "items": {
             "type": "object",
             "properties": {
@@ -74,7 +75,7 @@ OPEN_SCHEMA = {
 def _normalise(args: dict) -> dict:
     voices = [
         {"id": f"V{i + 1}", "name": str(v.get("name") or ("Melody" if i == 0 else "Part"))[:24],
-         "instrument": str(v.get("instrument", "piano")).lower(), "clef": "bass" if v.get("clef") == "bass" else "treble"}
+         "instrument": str(v.get("instrument", "piano")).lower(), "clef": clef_for(v.get("instrument"), v.get("clef"))}
         for i, v in enumerate((args.get("voices") or [])[:3])
     ]
     ids = [v["id"] for v in voices]
@@ -83,8 +84,12 @@ def _normalise(args: dict) -> dict:
         if not isinstance(bar, dict):
             continue
         notes = bar.get("notes") if isinstance(bar.get("notes"), dict) else bar
-        bars.append({"section": str(bar.get("section") or "A")[:3],
-                     "notes": {vid: str(notes.get(vid, "")).replace("|", " ").strip() for vid in ids}})
+        cleaned = {vid: str(notes.get(vid, "")).replace("|", " ").strip() for vid in ids}
+        for v in voices:
+            fretted = FRETTED.get(v["instrument"])
+            if fretted:
+                cleaned[v["id"]] = fold_into_range(cleaned[v["id"]], fretted[1], fretted[2])
+        bars.append({"section": str(bar.get("section") or "A")[:3], "notes": cleaned})
     return {**args, "voices": voices, "bars": bars}
 
 

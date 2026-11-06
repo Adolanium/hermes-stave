@@ -130,3 +130,46 @@ def test_a_returning_section_must_bring_its_bars_back():
     assert "1 of 4" in issue["message"] and "bars 1-4" in issue["message"]
     # the same music under a new id is not a return
     assert abc_check.check_piece({**base, "bars": bars(("A", a), ("B", b), ("C", new))}) == []
+
+
+def test_guitar_parts_have_a_fixed_clef_their_own_range_and_six_strings():
+    voices = [{"id": "V1", "instrument": "steel guitar", "clef": "bass"}, {"id": "V2", "instrument": "bass guitar", "clef": "treble"}]
+    good = {"title": "T", "key": "G", "meter": "4/4", "tempo": 90, "voices": voices, "sections": [{"id": "A"}],
+            "bars": [{"section": "A", "V1": '"G"[G,B,DGB]4 [G,B,DGB]4', "V2": "G,,4 D,4"}]}
+    assert abc_check.check_piece(tools._normalise(good)) == []
+    assert [v["clef"] for v in tools._normalise(good)["voices"]] == ["treble", "bass"]
+
+    # Straight to the checker: tools._normalise would move C, and C,, up an octave first.
+    bad = {**tools._normalise(good), "bars": [{"section": "A", "notes": {"V1": "C,8", "V2": "C,,8"}},
+                                              {"section": "A", "notes": {"V1": "[E,G,B,EGBe]8", "V2": "G,8"}}]}
+    messages = [(i["bar"], i["voice"], i["message"]) for i in abc_check.check_piece(bad)]
+    assert (1, "V1", "note outside the guitar range (E, to e' as written; nothing below E,, so a D chord starts on D, not D,)") in messages
+    assert (1, "V2", "note outside the bass guitar range (E,, to G as written; nothing below E,,)") in messages
+    assert (2, "V1", "a chord with 7 notes; this part has 6 strings") in messages
+    assert not [m for m in messages if m[0] == 2 and m[1] == "V2"]
+
+
+def test_guitar_chords_need_one_string_per_note_like_the_page():
+    guitar = abc_check.OPEN_STRINGS["guitar"]
+    assert abc_check.chord_fits_strings([55, 59, 62, 67, 71], guitar)
+    assert abc_check.chord_fits_strings([65, 62], guitar)
+    assert not abc_check.chord_fits_strings([52, 54], guitar)
+    assert not abc_check.chord_fits_strings([59, 62, 65], guitar)
+    assert not abc_check.chord_fits_strings([71, 70, 69], guitar)
+    assert abc_check.key_accidentals("G") == {"F": 1}
+    assert abc_check.key_accidentals("Dm") == {"B": -1}
+    piece = {"title": "T", "key": "G", "meter": "4/4", "tempo": 90, "sections": [{"id": "A"}],
+             "voices": [{"id": "V1", "instrument": "nylon guitar", "clef": "treble"}],
+             "bars": [{"section": "A", "V1": "[G,B,DGB]8"}, {"section": "A", "V1": "[B,DF]8"}, {"section": "A", "V1": "[B,D=F]8"}]}
+    issues = abc_check.check_piece(tools._normalise(piece))
+    assert [i["bar"] for i in issues] == [2, 3]
+    assert "same string" in issues[0]["message"]
+
+
+def test_out_of_range_guitar_notes_move_by_octaves_like_the_page():
+    assert abc_check.fold_into_range('"Dm"D,2 F2 A2', -5, 16) == '"Dm"D2 F2 A2'
+    assert abc_check.fold_into_range("[D,A,DF]4 ^C,,2 a'2", -5, 16) == "[DA,DF]4 ^C2 a2"
+    assert abc_check.fold_into_range("C,,4 c4", -12, 4) == "C,4 C4"
+    piece = tools._normalise({"voices": [{"id": "V1", "instrument": "steel guitar"}, {"id": "V2", "instrument": "flute"}],
+                              "bars": [{"section": "A", "V1": "D,4 D,4", "V2": "D,4 D,4"}]})
+    assert piece["bars"][0]["notes"] == {"V1": "D4 D4", "V2": "D,4 D,4"}

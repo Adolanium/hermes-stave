@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
-import { badBars, checkPiece, lintBar } from '../src/music/check.js'
+import { badBars, checkPiece, chordFitsStrings, lintBar } from '../src/music/check.js'
 import { changeBars, compose, reshape } from '../src/music/compose.js'
 import { parseJson, readBars } from '../src/music/hermes.js'
-import { barLength, pieceFromPlan, restoreVersion, sectionRanges, spliceBars, toAbc, withVersion } from '../src/music/model.js'
+import { FRETTED_RANGE, barLength, clefFor, foldIntoRange, pieceFromPlan, restoreVersion, sectionRanges, spliceBars, tablatureFor, toAbc, withVersion } from '../src/music/model.js'
 
 const abcjs = createRequire(import.meta.url)('abcjs')
 
@@ -239,4 +239,113 @@ test('an edit that overruns the bar goes back to the edit prompt, and a repair b
   assert.equal(stubborn.calls.length, 3)
   assert.match(stubborn.calls[2].input, /the person asked: end on a long note/)
   assert.equal(second.note, 'Hermes kept these bars as they were. Try asking another way.')
+})
+
+test('guitar parts get a treble clef, TAB under them, and sound an octave below how they are written', () => {
+  const piece = pieceFromPlan({
+    ...PLAN,
+    voices: [
+      { name: 'Melody', instrument: 'flute', clef: 'treble' },
+      { name: 'Guitar', instrument: 'steel guitar', clef: 'bass' },
+      { name: 'Bass', instrument: 'bass guitar', clef: 'treble' }
+    ]
+  })
+  assert.deepEqual(piece.voices.map(v => v.clef), ['treble', 'treble', 'bass'])
+  assert.equal(clefFor('cello', 'bass'), 'bass')
+  assert.equal(clefFor('electric guitar', 'bass'), 'treble')
+  const tabs = tablatureFor(piece)
+  assert.deepEqual(tabs.map(t => t.instrument), ['', 'guitar', 'guitar'])
+  assert.deepEqual(tabs[1].tuning, ['E,', 'A,', 'D', 'G', 'B', 'e'])
+  assert.deepEqual(tabs[2].tuning, ['E,,', 'A,,', 'D,', 'G,'])
+  assert.equal(tablatureFor(pieceFromPlan(PLAN)), undefined)
+
+  const abc = toAbc({ ...piece, bars: [{ section: 'A', notes: { V1: 'c8', V2: '[G,B,DGB]8', V3: 'G,,8' } }] })
+  assert.match(abc, /V:V2 clef=treble name="Acoustic guitar"/)
+  assert.equal(abcjs.parseOnly(abc)[0].warnings, undefined)
+  // What the synth plays: each part on its own instrument, fretted parts an octave below how they
+  // are written (G, is G3 on paper and G2, MIDI 43, in sound).
+  assert.deepEqual(midiNotes(abc), [{ program: 73, pitch: 72 }, { program: 25, pitch: 43 }, { program: 33, pitch: 31 }])
+})
+
+test('every part plays on its own instrument, not all on the piano', () => {
+  const piece = { ...pieceFromPlan(PLAN), bars: [{ section: 'A', notes: { V1: 'c8', V2: 'C,8' } }] }
+  assert.deepEqual(midiNotes(toAbc(piece)), [{ program: 73, pitch: 72 }, { program: 42, pitch: 48 }])
+})
+
+/** Program and first note per MIDI track, read from the file abcjs would export. */
+function midiNotes(abc) {
+  const bytes = [...abcjs.synth.getMidiFile(abc, { midiOutputType: 'binary', chordsOff: true })[0]]
+  const out = []
+  let program = null
+  for (let i = 1; i < bytes.length - 2; i++) {
+    if ((bytes[i] & 0xf0) === 0xc0 && bytes[i - 1] === 0 && bytes[i + 1] < 128) program = bytes[i + 1]
+    if ((bytes[i] & 0xf0) === 0x90 && bytes[i + 2] > 0 && bytes[i + 1] < 128 && program !== null) {
+      out.push({ program, pitch: bytes[i + 1] })
+      program = null
+    }
+  }
+  return out
+}
+
+test('fretted parts are checked against their own range and string count', () => {
+  const base = pieceFromPlan({
+    ...PLAN,
+    voices: [
+      { name: 'Guitar', instrument: 'nylon guitar', clef: 'treble' },
+      { name: 'Bass', instrument: 'bass guitar', clef: 'bass' }
+    ]
+  })
+  const piece = {
+    ...base,
+    bars: [
+      { section: 'A', notes: { V1: '[E,B,EGBe]8', V2: 'E,,8' } },
+      { section: 'A', notes: { V1: 'C,8', V2: 'C,,8' } },
+      { section: 'A', notes: { V1: '[E,G,B,EGBe]8', V2: '[E,,B,,]8' } },
+      { section: 'A', notes: { V1: "g'8", V2: 'c8' } }
+    ]
+  }
+  const issues = checkPiece(piece, abcjs, toAbc(piece))
+  const at = (bar, voice) => issues.filter(i => i.bar === bar && i.voice === voice).map(i => i.message)
+  assert.deepEqual(at(0, 'V1'), [])
+  assert.deepEqual(at(0, 'V2'), [])
+  assert.match(at(1, 'V1')[0], /outside the guitar range/)
+  assert.match(at(1, 'V2')[0], /outside the bass guitar range/)
+  assert.match(at(2, 'V1')[0], /7 notes; this part has 6 strings/)
+  assert.deepEqual(at(2, 'V2'), [])
+  assert.match(at(3, 'V1')[0], /outside the guitar range/)
+  assert.match(at(3, 'V2')[0], /outside the bass guitar range/)
+})
+
+test('a guitar chord must give every note its own string, as the TAB will draw it', () => {
+  const guitar = [52, 57, 62, 67, 71, 76]
+  // Open G, open E minor, and D with F (D moves to the A string): all print cleanly.
+  assert.equal(chordFitsStrings([55, 59, 62, 67, 71], guitar), true)
+  assert.equal(chordFitsStrings([52, 59, 64, 67, 71, 76], guitar), true)
+  assert.equal(chordFitsStrings([65, 62], guitar), true)
+  // A clash on the low string, two clashes, and a half-step cluster do not.
+  assert.equal(chordFitsStrings([52, 54], guitar), false)
+  assert.equal(chordFitsStrings([59, 62, 65], guitar), false)
+  assert.equal(chordFitsStrings([71, 70, 69], guitar), false)
+
+  const piece = {
+    ...pieceFromPlan({ ...PLAN, key: 'G', voices: [{ name: 'Guitar', instrument: 'nylon guitar' }] }),
+    bars: [
+      { section: 'A', notes: { V1: '[G,B,DGB]8' } },
+      { section: 'A', notes: { V1: '[B,DF]8' } },
+      { section: 'A', notes: { V1: '[B,D=F]8' } }
+    ]
+  }
+  const issues = checkPiece(piece, abcjs, toAbc(piece))
+  assert.deepEqual(issues.map(i => i.bar), [1, 2])
+  assert.match(issues[0].message, /same string/)
+})
+
+test('notes beyond a guitar part are moved by octaves into it, as a player would', () => {
+  assert.equal(foldIntoRange('"Dm"D,2 F2 A2', FRETTED_RANGE.guitar), '"Dm"D2 F2 A2')
+  assert.equal(foldIntoRange('[D,A,DF]4 ^C,,2 a\'2', FRETTED_RANGE.guitar), "[DA,DF]4 ^C2 a2")
+  assert.equal(foldIntoRange('E,2 e\'2 z2', FRETTED_RANGE.guitar), "E,2 e'2 z2")
+  assert.equal(foldIntoRange('C,,4 c4', FRETTED_RANGE.bass), 'C,4 C4')
+  const piece = pieceFromPlan({ ...PLAN, voices: [{ name: 'Guitar', instrument: 'steel guitar' }, { name: 'Flute', instrument: 'flute' }] })
+  const [bar] = readBars({ bars: [{ V1: 'D,4 D,4', V2: 'D,4 D,4' }] }, piece, 1)
+  assert.deepEqual(bar.notes, { V1: 'D4 D4', V2: 'D,4 D,4' })
 })

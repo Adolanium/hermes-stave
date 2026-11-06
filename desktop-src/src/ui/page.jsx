@@ -3,7 +3,7 @@ import abcjs from 'abcjs'
 import { icons, Popover, PopoverContent, PopoverTrigger, writeClipboardText } from '@hermes/plugin-sdk'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { changeBars, compose, reshape } from '../music/compose.js'
-import { instrumentOf, restoreVersion, toAbc, withVersion } from '../music/model.js'
+import { instrumentOf, restoreVersion, tablatureFor, toAbc, withVersion } from '../music/model.js'
 import { makeAsk } from './ask.js'
 import { INBOX_EVENT } from './inbox.js'
 import { fmtTime, midiBytes, Player, barOfEvent } from './player.js'
@@ -420,6 +420,7 @@ export function StavePage({ storage }) {
         {piece && piece.bars.length > 0 ? (
           <Sheet
             abc={abc}
+            tablature={tablatureFor(piece)}
             barCount={piece.bars.length}
             marks={piece.marks}
             selection={selection}

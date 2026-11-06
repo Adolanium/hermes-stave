@@ -34,7 +34,7 @@ When a section returns (A B A), reuse the A bars with at most a small change nea
 }
 ```
 
-Instruments: piano, music box, celesta, vibraphone, marimba, nylon guitar, acoustic bass, violin, viola, cello, strings, harp, choir, trumpet, french horn, clarinet, oboe, flute, pan flute.
+Instruments: piano, music box, celesta, vibraphone, marimba, nylon guitar, steel guitar, electric guitar, bass guitar, acoustic bass, violin, viola, cello, strings, harp, choir, trumpet, french horn, clarinet, oboe, flute, pan flute.
 
 ## Notation (ABC, L:1/8)
 
@@ -46,6 +46,8 @@ Instruments: piano, music box, celesta, vibraphone, marimba, nylon guitar, acous
 - Chord symbols only in the first voice, in double quotes before the note where the harmony changes: `"Am"A2 c2 "F"F4`.
 - Never put bar lines, repeats, header fields (`K:`, `M:`), decorations or comments inside a bar.
 - Ranges: treble parts G3 to f6 (`G,` to `f'`); bass parts E1 to G4 (`E,,,` to `G`).
+- Guitars (`nylon guitar`, `steel guitar`, `electric guitar`) are written on the treble clef an octave above how they sound, as guitar music is, from `E,` to `e'`. The page draws TAB under them. Nothing below `E,` (a D chord starts on `D`, not `D,`). Use these shapes, spelled for C major (in another key, mark any note the key signature would change): G `[G,B,DGB]`, C `[CEGc]`, D `[DAd^f]`, Em `[E,B,EGB]`, Am `[A,EAc]`, E `[E,B,E^GB]`, A `[A,EA^c]`, Dm `[DAdf]`, F `[FAcf]`, Bm `[B,^FBd]`. `stave_check` rejects a chord that cannot give each note its own string. Broken chords and single-note lines read best.
+- Bass guitar is written on the bass clef an octave above how it sounds, from `E,,` to `G`, one note at a time.
 
 ## Writing well
 

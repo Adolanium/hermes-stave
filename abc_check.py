@@ -13,7 +13,8 @@ from fractions import Fraction
 
 METERS = {"4/4", "3/4", "6/8", "2/4"}
 INSTRUMENTS = {
-    "piano", "music box", "celesta", "vibraphone", "marimba", "nylon guitar", "acoustic bass",
+    "piano", "music box", "celesta", "vibraphone", "marimba", "nylon guitar", "steel guitar",
+    "electric guitar", "bass guitar", "acoustic bass",
     "violin", "viola", "cello", "strings", "harp", "choir", "trumpet", "french horn", "clarinet",
     "oboe", "flute", "pan flute",
 }
@@ -21,6 +22,113 @@ KEY_RE = re.compile(r"^[A-G][#b]?m?$")
 
 # Diatonic steps from middle C (C = 0, c = 7, C, = -7), the numbering abcjs uses.
 RANGES = {"treble": (-5, 17, "G3 to f6"), "bass": (-17, 4, "E1 to G4")}
+
+# Fretted parts are written an octave above how they sound, on a fixed clef, and the page draws TAB
+# under them: (clef, lowest, highest, range label, strings).
+_GUITAR_RANGE = "E, to e' as written; nothing below E,, so a D chord starts on D, not D,"
+FRETTED = {
+    "nylon guitar": ("treble", -5, 16, _GUITAR_RANGE, 6),
+    "steel guitar": ("treble", -5, 16, _GUITAR_RANGE, 6),
+    "electric guitar": ("treble", -5, 16, _GUITAR_RANGE, 6),
+    "bass guitar": ("bass", -12, 4, "E,, to G as written; nothing below E,,", 4),
+}
+
+
+def fold_into_range(text, low, high) -> str:
+    """Move notes outside a fretted part's range by whole octaves until they fit (a D chord written
+    from D, starts on D), leaving chord symbols and decorations alone. Same as the page's foldIntoRange."""
+    def fix(m):
+        acc, letter, marks = m.group(1), m.group(2), m.group(3)
+        pitch = "CDEFGAB".index(letter.upper()) + (7 if letter.islower() else 0) + 7 * (marks.count("'") - marks.count(","))
+        if low <= pitch <= high:
+            return m.group(0)
+        while pitch < low:
+            pitch += 7
+        while pitch > high:
+            pitch -= 7
+        octave = pitch // 7
+        name = letter.lower() + "'" * (octave - 1) if octave >= 1 else letter.upper() + "," * (-octave)
+        return acc + name
+    parts = re.split(r'("[^"]*"|![^!]*!)', str(text or ""))
+    return "".join(part if i % 2 else re.sub(r"([_^=]*)([A-Ga-g])([,']*)", fix, part) for i, part in enumerate(parts))
+
+
+def clef_for(instrument, clef) -> str:
+    """The clef a voice must use: fixed for fretted instruments, the writer's choice otherwise."""
+    fretted = FRETTED.get(str(instrument or "").lower())
+    if fretted:
+        return fretted[0]
+    return "bass" if clef == "bass" else "treble"
+
+
+# Open strings as written (an octave above sound), lowest first, in MIDI numbers.
+OPEN_STRINGS = {"guitar": [52, 57, 62, 67, 71, 76], "bass guitar": [40, 45, 50, 55]}
+_STEPS = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+_ACC = {"^": 1, "^^": 2, "_": -1, "__": -2, "=": 0}
+_MAJOR_FIFTHS = {"C": 0, "G": 1, "D": 2, "A": 3, "E": 4, "B": 5, "F#": 6, "C#": 7,
+                 "F": -1, "Bb": -2, "Eb": -3, "Ab": -4, "Db": -5, "Gb": -6, "Cb": -7}
+_MINOR_FIFTHS = {"A": 0, "E": 1, "B": 2, "F#": 3, "C#": 4, "G#": 5, "D#": 6, "A#": 7,
+                 "D": -1, "G": -2, "C": -3, "F": -4, "Bb": -5, "Eb": -6, "Ab": -7}
+
+
+def key_accidentals(key) -> dict:
+    """Sharps (+1) or flats (-1) by letter for a key like G, Bb or F#m."""
+    key = str(key or "C")
+    fifths = _MINOR_FIFTHS.get(key[:-1], 0) if key.endswith("m") else _MAJOR_FIFTHS.get(key, 0)
+    if fifths >= 0:
+        return {letter: 1 for letter in "FCGDAEB"[:fifths]}
+    return {letter: -1 for letter in "BEADGCF"[:-fifths]}
+
+
+def chord_fits_strings(pitches, open_strings) -> bool:
+    """Same rule as the page (desktop-src/src/music/check.js chordFitsStrings), checked against abcjs's
+    TAB on 900 random chords: high to low, each note on the highest string at or below it, one move
+    down a string for a clash between neighbours; no second clash, none on the lowest string, and no
+    two notes a half step apart or less."""
+    ordered = sorted(pitches, reverse=True)
+    if any(ordered[i - 1] - ordered[i] <= 1 for i in range(1, len(ordered))):
+        return False
+    pos = []
+    for m in ordered:
+        string = next((i for i in range(len(open_strings) - 1, -1, -1) if m >= open_strings[i]), -1)
+        if string < 0:
+            return False
+        pos.append([m, string])
+    moved = False
+    for j in range(len(pos) - 1):
+        a, b = pos[j], pos[j + 1]
+        if a[1] != b[1]:
+            continue
+        if a[1] == 0 or moved:
+            return False
+        mover = b if b[0] - open_strings[b[1]] < a[0] - open_strings[a[1]] else a
+        mover[1] -= 1
+        moved = True
+    return len({p[1] for p in pos}) == len(pos)
+
+
+def _unfingerable_chord(text, key, open_strings) -> bool:
+    """True when a chord in this bar cannot be given one string per note."""
+    keyacc = key_accidentals(key)
+    measure: dict = {}
+    clean = re.sub(r'"[^"]*"|![^!]*!', "", str(text))
+    for m in re.finditer(r"\[([^\]|]*)\]|([_^=]*)([A-Ga-g])([,']*)", clean):
+        group = [(n.group(1), n.group(2), n.group(3)) for n in _NOTE.finditer(m.group(1))] if m.group(1) is not None \
+            else [(m.group(2), m.group(3), m.group(4))]
+        midis = []
+        for acc, letter, octave in group:
+            name = letter.upper()
+            if acc:
+                measure[name] = _ACC.get(acc, 0)
+            base = 60 + _STEPS[name] + (12 if letter.islower() else 0) + 12 * octave.count("'") - 12 * octave.count(",")
+            midis.append(base + measure.get(name, keyacc.get(name, 0)))
+        if len(midis) > 1 and not chord_fits_strings(midis, open_strings):
+            return True
+    return False
+
+
+def _largest_chord(text) -> int:
+    return max((len(_NOTE.findall(m.group(1))) for m in _CHORD.finditer(re.sub(r'"[^"]*"', "", str(text)))), default=1)
 
 _LENGTH = r"(\d*)(/*)(\d*)"
 _NOTE = re.compile(r"([_^=]*)([A-Ga-g])([,']*)" + _LENGTH)
@@ -135,10 +243,23 @@ def check_piece(piece: dict) -> list[dict]:
             if length != want:
                 issues.append({"bar": index, "voice": vid, "kind": "length",
                                "message": f"{_fmt(length)} eighths, needs {_fmt(want)}"})
-            low, high, label = RANGES["bass" if v.get("clef") == "bass" else "treble"]
+            fretted = FRETTED.get(str(v.get("instrument", "")).lower())
+            if fretted:
+                _, low, high, label, strings = fretted
+                name = str(v.get("instrument")).lower().replace("nylon ", "").replace("steel ", "").replace("electric ", "")
+            else:
+                low, high, label = RANGES["bass" if v.get("clef") == "bass" else "treble"]
+                name, strings = v.get("clef", "treble"), 0
             if any(p < low or p > high for p in pitches):
                 issues.append({"bar": index, "voice": vid, "kind": "range",
-                               "message": f"note outside the {v.get('clef', 'treble')} range ({label})"})
+                               "message": f"note outside the {name} range ({label})"})
+            elif strings and _largest_chord(notes.get(vid, "")) > strings:
+                issues.append({"bar": index, "voice": vid, "kind": "range",
+                               "message": f"a chord with {_largest_chord(notes.get(vid, ''))} notes; this part has {strings} strings"})
+            elif strings and _unfingerable_chord(notes.get(vid, ""), key, OPEN_STRINGS["bass guitar" if strings == 4 else "guitar"]):
+                issues.append({"bar": index, "voice": vid, "kind": "range",
+                               "message": "two notes of a chord fall on the same string, so it cannot be fingered; "
+                                          "spread the chord out or drop a note"})
     issues.extend(_returns(bars, voices))
     return issues
 

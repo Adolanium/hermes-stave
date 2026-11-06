@@ -2,7 +2,7 @@
 // then writes one section at a time so each call stays short and the score fills in as it arrives.
 // `ask(instructions, input, { maxTokens, temperature })` is injected: Desktop's llm.oneshot in the app,
 // a canned function in tests.
-import { INSTRUMENTS, barsText, eighthsPerBar } from './model.js'
+import { FRETTED_RANGE, INSTRUMENTS, barsText, eighthsPerBar, foldIntoRange, instrumentOf } from './model.js'
 
 const INSTRUMENT_NAMES = Object.keys(INSTRUMENTS).join(', ')
 
@@ -13,7 +13,9 @@ const NOTATION_RULES = (meter) => `Notation: ABC with L:1/8, so a plain note is 
 - Chords: [CEG]2. Triplets: (3ABc = three eighths in the time of two. Ties: A2-A2.
 - Chord symbols for the first part only, in double quotes before the note where the harmony changes: "Am"A2 c2 "F"F4.
 - Never write bar lines, repeats, header fields, decorations, or comments inside a bar.
-- Treble parts stay between G3 and f6 (G, to f'). Bass parts stay between E1 and G4 (E,,, to G).`
+- Treble parts stay between G3 and f6 (G, to f'). Bass parts stay between E1 and G4 (E,,, to G).
+- Guitars (nylon guitar, steel guitar, electric guitar) are written on the treble clef an octave above how they sound, as guitar music is, between E, and e'; the page adds TAB under them. Nothing below E, (the open low string): a D chord starts on D, not D,. Use these chord shapes, spelled for C major (in another key, mark with ^ _ or = any note the key signature would change): G [G,B,DGB], C [CEGc], D [DAd^f], Em [E,B,EGB], Am [A,EAc], E [E,B,E^GB], A [A,EA^c], Dm [DAdf], F [FAcf], Bm [B,^FBd]. Broken chords (one note at a time from a shape) and single-note lines read best.
+- Bass guitar is written on the bass clef an octave above how it sounds, between E,, and G, one note at a time.`
 
 export const PLAN_INSTRUCTIONS = `You are the composer behind Stave, a page that turns a sentence into a short piece of sheet music.
 Plan the piece the person describes. Reply with JSON only, no prose, in exactly this shape:
@@ -21,7 +23,7 @@ Plan the piece the person describes. Reply with JSON only, no prose, in exactly 
  "meter": "4/4" | "3/4" | "6/8" | "2/4", "tempo": 40-200 (quarter notes per minute; for 6/8 dotted quarters),
  "voices": [{"name": "Melody", "instrument": "<instrument>", "clef": "treble" | "bass"}, ...],
  "sections": [{"id": "A", "name": "1-2 words", "bars": 4 or 8, "chords": ["one chord per bar, or two separated by a space"], "idea": "one line: contour, rhythm, register, how it relates to earlier sections"}]}
-Rules: 2 or 3 voices; the first is the melody. Pick instruments from: ${INSTRUMENT_NAMES}.
+Rules: 2 or 3 voices; the first is the melody. Pick instruments from: ${INSTRUMENT_NAMES}. Guitars use the treble clef and bass guitar the bass clef.
 Total length 16 to 32 bars across 2 to 4 sections; reuse section ids for a return (A B A) only when the music repeats.
 Give the piece a shape: a memorable motif, contrast in the middle, an ending that lands on the tonic.
 Respect anything specific the person asked for (instrument, length, tempo, style).`
@@ -70,7 +72,11 @@ export function readBars(reply, piece, count) {
   if (list.length !== count) throw new Error(`Hermes wrote ${list.length} bars, ${count} were asked for`)
   return list.map(b => {
     const notes = {}
-    for (const id of voiceIds(piece)) notes[id] = String(b?.[id] ?? '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim()
+    for (const v of piece.voices) {
+      const text = String(b?.[v.id] ?? '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim()
+      const tab = instrumentOf(v.instrument).tab
+      notes[v.id] = tab ? foldIntoRange(text, FRETTED_RANGE[tab]) : text
+    }
     return { notes }
   })
 }

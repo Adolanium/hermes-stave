@@ -10,7 +10,10 @@ export const INSTRUMENTS = {
   celesta: { program: 8, label: 'Celesta' },
   vibraphone: { program: 11, label: 'Vibraphone' },
   marimba: { program: 12, label: 'Marimba' },
-  'nylon guitar': { program: 24, label: 'Guitar' },
+  'nylon guitar': { program: 24, label: 'Classical guitar', tab: 'guitar' },
+  'steel guitar': { program: 25, label: 'Acoustic guitar', tab: 'guitar' },
+  'electric guitar': { program: 27, label: 'Electric guitar', tab: 'guitar' },
+  'bass guitar': { program: 33, label: 'Bass guitar', tab: 'bass' },
   'acoustic bass': { program: 32, label: 'Double bass' },
   violin: { program: 40, label: 'Violin' },
   viola: { program: 41, label: 'Viola' },
@@ -24,6 +27,54 @@ export const INSTRUMENTS = {
   oboe: { program: 68, label: 'Oboe' },
   flute: { program: 73, label: 'Flute' },
   'pan flute': { program: 75, label: 'Pan flute' }
+}
+
+/**
+ * Fretted instruments get a TAB staff under their notes. Like printed guitar music, their parts are
+ * written an octave above how they sound (guitar on a treble staff, bass guitar on a bass staff),
+ * so the tunings below are written pitches and playback drops these parts an octave.
+ */
+export const TAB_TUNINGS = {
+  guitar: ['E,', 'A,', 'D', 'G', 'B', 'e'],
+  bass: ['E,,', 'A,,', 'D,', 'G,']
+}
+
+/** Written range of fretted parts, in abcjs diatonic steps (C = 0): E, to e' and E,, to G. */
+export const FRETTED_RANGE = { guitar: [-5, 16], bass: [-12, 4] }
+
+/**
+ * Move notes outside a fretted part's range by whole octaves until they fit, as a player would:
+ * a D chord written from D, starts on D. Chord symbols and decorations are left alone.
+ */
+export function foldIntoRange(text, [low, high]) {
+  return String(text ?? '')
+    .split(/("[^"]*"|![^!]*!)/)
+    .map((part, i) => (i % 2 ? part : part.replace(/([_^=]*)([A-Ga-g])([,']*)/g, (whole, acc, letter, marks) => {
+      const step = 'CDEFGAB'.indexOf(letter.toUpperCase())
+      let pitch = step + (letter === letter.toLowerCase() ? 7 : 0) + 7 * ((marks.match(/'/g) || []).length - (marks.match(/,/g) || []).length)
+      if (pitch >= low && pitch <= high) return whole
+      while (pitch < low) pitch += 7
+      while (pitch > high) pitch -= 7
+      const octave = Math.floor(pitch / 7)
+      const name = octave >= 1 ? letter.toLowerCase() + "'".repeat(octave - 1) : letter.toUpperCase() + ','.repeat(-octave)
+      return acc + name
+    })))
+    .join('')
+}
+
+/** The clef a voice must use: fretted instruments have a fixed one; others keep what Hermes chose. */
+export function clefFor(instrument, clef) {
+  const tab = INSTRUMENTS[String(instrument || '').toLowerCase()]?.tab
+  if (tab === 'guitar') return 'treble'
+  if (tab === 'bass') return 'bass'
+  return clef === 'bass' ? 'bass' : 'treble'
+}
+
+/** abcjs tablature options, one entry per voice (staff); an empty instrument means no TAB. */
+export function tablatureFor(piece) {
+  const tabs = piece.voices.map(v => instrumentOf(v.instrument).tab)
+  if (!tabs.some(Boolean)) return undefined
+  return tabs.map(tab => (tab ? { instrument: 'guitar', label: '', tuning: TAB_TUNINGS[tab] } : { instrument: '' }))
 }
 
 const KEY_RE = /^[A-G][#b]?m?$/
@@ -95,7 +146,12 @@ export function toAbc(piece, { tempo } = {}) {
     const chunk = piece.bars.slice(start, start + perLine)
     piece.voices.forEach((v, vi) => {
       let text = `[V:${v.id}] `
-      if (start === 0) text += `%%MIDI program ${instrumentOf(v.instrument).program}\n[V:${v.id}] `
+      if (start === 0) {
+        // MIDI directives only reach the synth on their own lines after a V: line; written inline
+        // after [V:..] they are ignored and every part plays as a piano.
+        const inst = instrumentOf(v.instrument)
+        text = `V:${v.id}\n%%MIDI program ${inst.program}\n${inst.tab ? '%%MIDI transpose -12\n' : ''}[V:${v.id}] `
+      }
       chunk.forEach((bar, j) => {
         const index = start + j
         text += `${(bar.notes[v.id] || 'z8').trim()} ${index === piece.bars.length - 1 ? '|]' : '|'} `
@@ -113,7 +169,7 @@ export function pieceFromPlan(plan, prompt) {
     id: `V${i + 1}`,
     name: String(v.name || (i === 0 ? 'Melody' : 'Part')).slice(0, 24),
     instrument: INSTRUMENTS[String(v.instrument || '').toLowerCase()] ? String(v.instrument).toLowerCase() : 'piano',
-    clef: v.clef === 'bass' ? 'bass' : 'treble'
+    clef: clefFor(v.instrument, v.clef)
   }))
   if (voices.length === 0) voices.push({ id: 'V1', name: 'Melody', instrument: 'piano', clef: 'treble' })
   const sections = (Array.isArray(plan.sections) ? plan.sections : []).slice(0, 6).map((s, i) => ({
@@ -186,7 +242,7 @@ export function pieceFromAgent(entry) {
     id: `V${i + 1}`,
     name: String(v.name || (i === 0 ? 'Melody' : 'Part')).slice(0, 24),
     instrument: INSTRUMENTS[String(v.instrument || '').toLowerCase()] ? String(v.instrument).toLowerCase() : 'piano',
-    clef: v.clef === 'bass' ? 'bass' : 'treble'
+    clef: clefFor(v.instrument, v.clef)
   }))
   const bars = (entry.bars || []).map(b => ({
     section: String(b.section || 'A').slice(0, 3),

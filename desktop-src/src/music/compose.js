@@ -2,7 +2,7 @@
 // can show what Hermes is doing while it does it. Also the bar edit and whole-piece reshape flows.
 import { badBars, checkPiece } from './check.js'
 import { editBars, planPiece, readBars, repairBars, reshapePiece, writeSection } from './hermes.js'
-import { INSTRUMENTS, METERS, eighthsPerBar, pieceFromPlan, spliceBars, toAbc, withVersion } from './model.js'
+import { INSTRUMENTS, METERS, clefFor, eighthsPerBar, pieceFromPlan, spliceBars, toAbc, withVersion } from './model.js'
 
 function mark(kind, from, to, text) {
   return { kind, from, to, text, at: Date.now() }
@@ -152,7 +152,10 @@ export async function reshape(ask, abcjs, piece, request, emit = () => {}) {
         id: `V${i + 1}`,
         name: String(v.name || next.voices[i]?.name || 'Part').slice(0, 24),
         instrument: INSTRUMENTS[String(v.instrument || '').toLowerCase()] ? String(v.instrument).toLowerCase() : next.voices[i]?.instrument || 'piano',
-        clef: v.clef === 'bass' ? 'bass' : v.clef === 'treble' ? 'treble' : next.voices[i]?.clef || 'treble'
+        clef: clefFor(
+          INSTRUMENTS[String(v.instrument || '').toLowerCase()] ? String(v.instrument).toLowerCase() : next.voices[i]?.instrument,
+          v.clef === 'bass' || v.clef === 'treble' ? v.clef : next.voices[i]?.clef
+        )
       }))
     }
   }

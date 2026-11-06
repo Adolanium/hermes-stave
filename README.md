@@ -45,6 +45,7 @@ Each section is written in [ABC notation](https://abcnotation.com/) and checked 
 |---|---|
 | **Bar length** | any part whose notes do not add up to the meter (6/8 needs six eighths, triplets included) |
 | **Range** | a note a flute or a cello could not play (treble parts G3 to F6, bass parts E1 to G4) |
+| **Strings** | a guitar chord a hand could not hold: two notes on one string, or more notes than strings |
 | **Syntax** | stray bar lines, unclosed chord symbols, anything the engraver cannot parse |
 
 Bars that fail go back to Hermes with the reason, once. The repaired ones are circled in the margin, *checked and fixed*, so you can see where it corrected itself.
@@ -55,7 +56,7 @@ Bars that fail go back to Hermes with the reason, once. The repaired ones are ci
   <img src="docs/images/play.gif" alt="Playback: the sounding notes light up and a glowing blue line slides along the melody" width="100%">
 </p>
 
-Press play or Space. Each instrument plays with its own sampled voice: music box, harp, cello, flute, strings, celesta and a dozen more. The melody lights in full blue, the accompaniment in a softer tint, and the page turns itself when the music moves to the next system. Slow it down, speed it up, or loop just the bars you selected.
+Press play or Space. Each instrument plays with its own sampled voice: music box, harp, cello, flute, guitar, strings, celesta and a dozen more. The melody lights in full blue, the accompaniment in a softer tint, and the page turns itself when the music moves to the next system. Slow it down, speed it up, or loop just the bars you selected.
 
 ### V. *Rubato* · you change it
 
@@ -77,7 +78,8 @@ Every change keeps a snapshot. Undo with the arrow or ⌘Z / Ctrl+Z and you are 
 
 | | |
 |---|---|
-| **Instruments** | piano, music box, celesta, vibraphone, marimba, guitar, harp, violin, viola, cello, double bass, strings, choir, trumpet, horn, clarinet, oboe, flute, pan flute |
+| **Instruments** | piano, music box, celesta, vibraphone, marimba, classical guitar, acoustic guitar, electric guitar, bass guitar, harp, violin, viola, cello, double bass, strings, choir, trumpet, horn, clarinet, oboe, flute, pan flute |
+| **Guitar** | guitar and bass guitar parts get a TAB staff under the notes, with the fret for each string. They are written an octave above how they sound, as guitar music is, and play at their real pitch. Chords use shapes a hand can hold. |
 | **Meters** | 4/4, 3/4, 6/8, 2/4 |
 | **Keys** | C, G, D, A, F, B♭, E♭ major; A, E, B, F♯, D, G, C minor |
 | **Length** | 16 to 32 bars in 2 to 4 sections, longer on request |
