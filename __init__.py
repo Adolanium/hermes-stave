@@ -24,9 +24,13 @@ def register(ctx):
         description="Write a short piece of music as Stave ABC: plan the form, write bars that add up, "
                     "check them with stave_check, and open the piece on the Stave page with stave_open.",
     )
+    # Reasoning off by default: measured on a reasoning model, an 8-bar section took 2-8 s instead of
+    # 21-29 s, and the page's checker repairs the occasional bar that does not add up. Set
+    # auxiliary.stave.reasoning_effort to turn thinking back on.
     ctx.register_auxiliary_task(
         "stave",
         display_name="Stave composer",
-        description="Writes and revises the music on the Stave page. A fast model keeps it quick; "
-                    "a stronger one writes better melodies.",
+        description="Writes and revises the music on the Stave page. Reasoning is off by default so "
+                    "pieces and edits arrive in seconds; turn it on for more considered music.",
+        defaults={"reasoning_effort": "none"},
     )

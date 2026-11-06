@@ -138,7 +138,7 @@ function rangeBoxes(boxes, from, to) {
 const RENDER_OPTIONS = width => ({
   add_classes: true,
   staffwidth: Math.max(520, width - 40),
-  paddingtop: 30,
+  paddingtop: 52,
   paddingbottom: 10,
   paddingleft: 4,
   paddingright: 24,
@@ -312,17 +312,22 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
           const note = document.createElement('div')
           note.className = 'st-note'
           note.dataset.kind = m.kind
-          const stack = used.get(`${b.line}:${Math.round(b.x)}`) || 0
-          used.set(`${b.line}:${Math.round(b.x)}`, stack + 1)
-          note.style.left = `${b.x + 4}px`
-          note.style.top = `${Math.min(b.y, b.ink) - 26 - stack * 19}px`
           note.style.setProperty('--st-delay', fresh && animate ? `${400 + k * 60}ms` : '0ms')
           note.textContent = m.text
           overlay.appendChild(note)
           // Keep the note on the page: a note near the right edge ends where its bars end.
           const room = overlay.clientWidth - 8
           const width = note.getBoundingClientRect().width
-          if (b.x + 4 + width > room) note.style.left = `${Math.max(0, Math.min(b.x + b.w, room) - width)}px`
+          let left = b.x + 4
+          if (left + width > room) left = Math.max(0, Math.min(b.x + b.w, room) - width)
+          // Notes on one system never overlap: a note that would touch another moves up a row.
+          const placed = used.get(b.line) || []
+          let top = Math.min(b.y, b.ink) - 26
+          while (placed.some(r => left < r.right + 12 && left + width + 12 > r.left && Math.abs(r.top - top) < 18)) top -= 19
+          placed.push({ left, right: left + width, top })
+          used.set(b.line, placed)
+          note.style.left = `${left}px`
+          note.style.top = `${top}px`
         }
       }
     })

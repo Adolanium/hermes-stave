@@ -30,7 +30,14 @@ async function checkAndRepair(ask, piece, abcjs, scope, emit) {
 
 /** Write one section after `context` (the bars it should answer), check it and repair it once. */
 async function writeChecked(ask, abcjs, context, section, emit) {
-  const bars = await writeSection(ask, context, section)
+  // One retry: a slow or garbled reply on one section should not cost the whole piece.
+  let bars
+  try {
+    bars = await writeSection(ask, context, section)
+  } catch (e) {
+    emit({ phase: 'retry', section: section.id, error: String(e?.message || e) })
+    bars = await writeSection(ask, context, section)
+  }
   const from = context.bars.length
   let draft = { ...context, bars: [...context.bars, ...bars.map(b => ({ section: section.id, notes: b.notes }))] }
   const scope = bars.map((_, k) => from + k)

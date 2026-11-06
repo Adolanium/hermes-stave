@@ -108,9 +108,13 @@ export async function repairBars(ask, piece, indexes, issues) {
   return readBars(parseJson(text), piece, indexes.length)
 }
 
-/** Tokens a reply of `bars` bars needs: about 45 per voice per bar, plus room for the JSON. */
+/**
+ * Token ceiling for a reply of `bars` bars: about 45 per voice per bar for the notes and JSON, plus
+ * room for a model's hidden reasoning, which counts against the same limit when it is turned on.
+ * The ceiling costs nothing when unused; a tight one would cut a thinking model off mid-answer.
+ */
 export function replyBudget(piece, bars) {
-  return Math.min(3200, 260 + bars * piece.voices.length * 45)
+  return Math.min(12000, 4000 + bars * piece.voices.length * 45)
 }
 
 /**

@@ -3,7 +3,7 @@ import abcjs from 'abcjs'
 import { icons, Popover, PopoverContent, PopoverTrigger, writeClipboardText } from '@hermes/plugin-sdk'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { changeBars, compose, reshape } from '../music/compose.js'
-import { instrumentOf, restoreVersion, toAbc } from '../music/model.js'
+import { instrumentOf, restoreVersion, toAbc, withVersion } from '../music/model.js'
 import { makeAsk } from './ask.js'
 import { INBOX_EVENT } from './inbox.js'
 import { fmtTime, midiBytes, Player, barOfEvent } from './player.js'
@@ -253,6 +253,7 @@ export function StavePage({ storage }) {
     player.setTune(null)
     setProgress({ label: 'Planning the form', step: 0, total: 1 })
     setWriting({ text: 'planning the form…' })
+    let latest = null
     try {
       await compose(ask, abcjs, text, ev => {
         if (ev.phase === 'plan') {
@@ -265,7 +266,10 @@ export function StavePage({ storage }) {
           setProgress(p => ({ ...p, label: `Writing ${label}` }))
         } else if (ev.phase === 'repair') {
           setWriting({ text: `checking bar${ev.bars.length > 1 ? 's' : ''} ${ev.bars.map(b => b + 1).join(', ')}…` })
+        } else if (ev.phase === 'retry') {
+          setWriting({ text: 'trying that section again…' })
         } else if (ev.phase === 'section') {
+          latest = ev.piece
           setPiece(ev.piece)
           setSlither({ from: ev.from, to: ev.to, key: Date.now() })
           setProgress(p => ({ ...p, step: (p?.step || 1) + 1 }))
@@ -275,7 +279,15 @@ export function StavePage({ storage }) {
         }
       }, () => cancelRef.current)
     } catch (e) {
-      if (String(e?.message) !== 'cancelled') setError(friendly(e))
+      // Keep whatever was written: a piece that stopped part-way is still yours to play and change.
+      if (latest?.bars.length) {
+        const partial = withVersion({ ...latest, updatedAt: Date.now() }, 'Written in part')
+        setPiece(partial)
+        persist(partial)
+      }
+      if (String(e?.message) !== 'cancelled') {
+        setError(latest?.bars.length ? `${friendly(e)} The first ${latest.bars.length} bars are saved.` : friendly(e))
+      }
     } finally {
       setPhase('idle')
       setWriting(null)

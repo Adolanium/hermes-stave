@@ -106,7 +106,7 @@ def test_register_wires_tools_skill_and_task():
     class Ctx:
         def register_tool(self, **kw): calls.append(("tool", kw["name"]))
         def register_skill(self, name, path, description=""): calls.append(("skill", name, Path(path).exists()))
-        def register_auxiliary_task(self, key, **kw): calls.append(("task", key))
+        def register_auxiliary_task(self, key, **kw): calls.append(("task", key, kw.get("defaults")))
 
     pkg.register(Ctx())
-    assert calls == [("tool", "stave_check"), ("tool", "stave_open"), ("skill", "compose", True), ("task", "stave")]
+    assert calls == [("tool", "stave_check"), ("tool", "stave_open"), ("skill", "compose", True), ("task", "stave", {"reasoning_effort": "none"})]

@@ -95,7 +95,7 @@ Enable **Stave** in Capabilities → Plugins. It appears in the sidebar and as *
 
 **Which model writes the music.** Stave registers its own task, **Stave composer**, in Settings → Models. With nothing set there, Hermes uses your main model. A fast model keeps writing and edits quick; a stronger one writes better melodies.
 
-**How it stays quick.** Hermes writes the opening section first, because it sets the motif. Every other new section is then written at the same time, and a returning section (the second *A* of *A B A*) reuses the bars already written instead of asking again. An edit sends only the bars around your selection.
+**How it stays quick.** On a fast model a whole piece arrives in about five seconds and a bar edit in about one. Stave composer runs with reasoning off by default: the page's own checker catches any bar that does not add up and has Hermes repair it, so hidden thinking adds wait without adding safety. Every new section is written at the same time straight after the plan, a returning section (the second *A* of *A B A*) reuses the bars already written, and an edit sends only the bars around your selection. If a section fails, Stave asks once more; if it still fails, the bars already written are kept. To let the model think, set `auxiliary.stave.reasoning_effort` (for example `low`) in your Hermes config.
 
 ### Building from source
 

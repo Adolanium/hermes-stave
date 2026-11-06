@@ -193,3 +193,16 @@ test('a bar edit sends only the bars around the selection', async () => {
   assert.doesNotMatch(calls[0].input, /^1: /m)
   assert.match(calls[0].input, /^13: /m)
 })
+
+test('a section that fails once is asked again instead of losing the piece', async () => {
+  let failedOnce = false
+  const ask = async (instructions, input) => {
+    if (instructions.startsWith('You are the composer')) return JSON.stringify(PLAN)
+    if (/Now write section B/.test(input) && !failedOnce) { failedOnce = true; throw new Error('one-shot generation failed: timed out') }
+    return JSON.stringify({ bars: /Now write section A/.test(input) ? A : B })
+  }
+  const events = []
+  const piece = await compose(ask, abcjs, 'x', e => events.push(e.phase))
+  assert.ok(events.includes('retry'))
+  assert.equal(piece.bars.length, 8)
+})
