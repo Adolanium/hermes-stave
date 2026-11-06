@@ -1,0 +1,14 @@
+name: stave
+version: "0.1.0"
+description: "Describe a piece of music and Hermes writes it as sheet music: the page engraves the score, plays it with the sounding notes lit, and changes any bars you pick when you ask in words."
+author: Adolanium
+license: MIT
+homepage: https://github.com/Adolanium/hermes-stave
+manifest_version: 1
+kind: standalone
+requires_hermes: ">=0.22.6"
+
+provides_tools: []
+provides_hooks: []
+provides_middleware: []
+requires_env: []

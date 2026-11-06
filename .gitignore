@@ -1,0 +1,7 @@
+desktop-src/node_modules/
+.DS_Store
+__pycache__/
+.impeccable/review/
+PRODUCT.md
+DESIGN.md
+.impeccable/

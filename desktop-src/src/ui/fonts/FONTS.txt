@@ -1,0 +1,3 @@
+Bodoni Moda: SIL Open Font License 1.1, (c) The Bodoni Moda Project Authors, https://github.com/indestructible-type/Bodoni
+Kalam: SIL Open Font License 1.1, (c) Indian Type Foundry, https://github.com/itfoundry/kalam
+Source: Google Fonts latin subsets, downloaded 2026-11-06.
