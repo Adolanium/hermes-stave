@@ -95,6 +95,36 @@ export function dropKeyAccidentals(text, key) {
     .join('')
 }
 
+const ACCIDENTAL_SIGN = { 1: '^', 2: '^^', '-1': '_', '-2': '__', 0: '=' }
+
+/**
+ * Write an accidental out when a letter already carried a different one earlier in the bar, in another
+ * octave. Playback reads accidentals octave by octave, as ABC and engravers do, but abcjs's TAB reads
+ * them by letter: after =C, a plain c (C sharp in D major) would get C natural's fret. The courtesy
+ * accidental makes all three agree, and is what an engraver would print there anyway.
+ */
+export function courtesyAccidentals(text, key) {
+  const keyAcc = keyAccidentals(key)
+  const byOctave = new Map()
+  const byLetter = new Map()
+  return String(text ?? '')
+    .split(/("[^"]*"|![^!]*!)/)
+    .map((part, i) => (i % 2 ? part : part.replace(/(\^\^|__|[_^=])?([A-Ga-g])([,']*)/g, (whole, acc, letter, marks) => {
+      const name = letter.toUpperCase()
+      const slot = `${name}${letter === letter.toLowerCase() ? 1 : 0}${marks}`
+      if (acc) {
+        byOctave.set(slot, ACCIDENTAL_VALUE[acc])
+        byLetter.set(name, ACCIDENTAL_VALUE[acc])
+        return whole
+      }
+      const sounding = byOctave.has(slot) ? byOctave.get(slot) : keyAcc[name] ?? 0
+      if (!byLetter.has(name) || byLetter.get(name) === sounding) return whole
+      byLetter.set(name, sounding)
+      return ACCIDENTAL_SIGN[sounding] + letter + marks
+    })))
+    .join('')
+}
+
 /** The clef a voice must use: fretted instruments have a fixed one; others keep what Hermes chose. */
 export function clefFor(instrument, clef) {
   const tab = INSTRUMENTS[String(instrument || '').toLowerCase()]?.tab

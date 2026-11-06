@@ -73,6 +73,35 @@ def drop_key_accidentals(text, key) -> str:
     return "".join(part if i % 2 else re.sub(r"(\^\^|__|[_^=])?([A-Ga-g])", fix, part) for i, part in enumerate(parts))
 
 
+_SIGN = {1: "^", 2: "^^", -1: "_", -2: "__", 0: "="}
+
+
+def courtesy_accidentals(text, key) -> str:
+    """Write an accidental out when its letter carried a different one earlier in the bar, in another
+    octave, so playback (octave by octave) and the TAB (letter by letter) agree. Same as the page's
+    courtesyAccidentals."""
+    keyacc = key_accidentals(key)
+    by_octave: dict = {}
+    by_letter: dict = {}
+
+    def fix(m):
+        acc, letter, marks = m.group(1), m.group(2), m.group(3)
+        name = letter.upper()
+        slot = f"{name}{1 if letter.islower() else 0}{marks}"
+        if acc:
+            by_octave[slot] = _ACC.get(acc, 0)
+            by_letter[name] = _ACC.get(acc, 0)
+            return m.group(0)
+        sounding = by_octave.get(slot, keyacc.get(name, 0))
+        if name not in by_letter or by_letter[name] == sounding:
+            return m.group(0)
+        by_letter[name] = sounding
+        return _SIGN[sounding] + letter + marks
+
+    parts = re.split(r'("[^"]*"|![^!]*!)', str(text or ""))
+    return "".join(part if i % 2 else re.sub(r"(\^\^|__|[_^=])?([A-Ga-g])([,']*)", fix, part) for i, part in enumerate(parts))
+
+
 def clef_for(instrument, clef) -> str:
     """The clef a voice must use: fixed for fretted instruments, the writer's choice otherwise."""
     fretted = FRETTED.get(str(instrument or "").lower())

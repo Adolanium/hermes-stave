@@ -2,7 +2,7 @@
 // then writes one section at a time so each call stays short and the score fills in as it arrives.
 // `ask(instructions, input, { maxTokens, temperature })` is injected: Desktop's llm.oneshot in the app,
 // a canned function in tests.
-import { FRETTED_RANGE, INSTRUMENTS, barsText, dropKeyAccidentals, eighthsPerBar, foldIntoRange, instrumentOf } from './model.js'
+import { FRETTED_RANGE, INSTRUMENTS, barsText, courtesyAccidentals, dropKeyAccidentals, eighthsPerBar, foldIntoRange, instrumentOf } from './model.js'
 
 const INSTRUMENT_NAMES = Object.keys(INSTRUMENTS).join(', ')
 
@@ -14,7 +14,10 @@ const NOTATION_RULES = (meter) => `Notation: ABC with L:1/8, so a plain note is 
 - Chord symbols for the first part only, in double quotes before the note where the harmony changes: "Am"A2 c2 "F"F4.
 - Never write bar lines, repeats, header fields, decorations, or comments inside a bar.
 - Treble parts stay between G3 and f6 (G, to f'). Bass parts stay between E1 and G4 (E,,, to G).
-- Guitars (nylon guitar, steel guitar, electric guitar) are written on the treble clef an octave above how they sound, as guitar music is, between E, and e'; the page adds TAB under them. Nothing below E, (the open low string): a D chord starts on D, not D,. Use these chord shapes, spelled for C major (in another key, mark with ^ _ or = any note the key signature would change): G [G,B,DGBg], C [CEGce], D [DAd^f], Em [E,B,EGBe], Am [A,EAce], E [E,B,E^GBe], A [A,EA^ce], Dm [DAdf], F [FAcf], Bm [B,^FBd^f]. Do not repeat one block chord on every beat: pick the shape one note at a time (G,B,DG BGDB) or strum it in a rhythm (chord2 then shorter strums, with a rest or a held chord).
+- Guitars (nylon guitar, steel guitar, electric guitar) are written on the treble clef an octave above how they sound, as guitar music is, between E, and e'; the page adds TAB under them. Nothing below E, (the open low string): a D chord starts on D, not D,. Use these chord shapes, spelled for C major (in another key, mark with ^ _ or = any note the key signature would change): G [G,B,DGBg], C [CEGce], D [DAd^f], Em [E,B,EGBe], Am [A,EAce], E [E,B,E^GBe], A [A,EA^ce], Dm [DAdf], F [FAcf], Bm [B,^FBd^f].
+- Accompany like a guitarist, not with one block chord on every beat. Patterns, shown on G (the shape's lowest note is the bass, the rest is the strum; the second bass is the chord's fifth: D for G, G, for C, A, for D, B, for Em, E for Am):
+  4/4 bass and strum: G,2 [DGBg]2 D2 [DGBg]2 · picked: G,B,DG BGDB, · waltz 3/4: G,2 [DGB]2 [DGB]2 · 6/8: G,DG BGD
+  Change pattern between sections, and hold a full chord at the end of a phrase.
 - Bass guitar is written on the bass clef an octave above how it sounds, between E,, and G, one note at a time.`
 
 export const PLAN_INSTRUCTIONS = `You are the composer behind Stave, a page that turns a sentence into a short piece of sheet music.
@@ -75,7 +78,8 @@ export function readBars(reply, piece, count) {
     for (const v of piece.voices) {
       const text = String(b?.[v.id] ?? '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim()
       const tab = instrumentOf(v.instrument).tab
-      notes[v.id] = dropKeyAccidentals(tab ? foldIntoRange(text, FRETTED_RANGE[tab]) : text, piece.meta.key)
+      const key = piece.meta.key
+      notes[v.id] = courtesyAccidentals(dropKeyAccidentals(tab ? foldIntoRange(text, FRETTED_RANGE[tab]) : text, key), key)
     }
     return { notes }
   })

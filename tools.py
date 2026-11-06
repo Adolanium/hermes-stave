@@ -11,7 +11,7 @@ import json
 import time
 import uuid
 
-from .abc_check import FRETTED, INSTRUMENTS, check_piece, clef_for, drop_key_accidentals, fold_into_range
+from .abc_check import FRETTED, INSTRUMENTS, check_piece, clef_for, courtesy_accidentals, drop_key_accidentals, fold_into_range
 from .inbox import Inbox
 
 TOOLSET = "stave"
@@ -89,7 +89,7 @@ def _normalise(args: dict) -> dict:
             fretted = FRETTED.get(v["instrument"])
             if fretted:
                 cleaned[v["id"]] = fold_into_range(cleaned[v["id"]], fretted[1], fretted[2])
-            cleaned[v["id"]] = drop_key_accidentals(cleaned[v["id"]], args.get("key"))
+            cleaned[v["id"]] = courtesy_accidentals(drop_key_accidentals(cleaned[v["id"]], args.get("key")), args.get("key"))
         bars.append({"section": str(bar.get("section") or "A")[:3], "notes": cleaned})
     return {**args, "voices": voices, "bars": bars}
 

@@ -1,6 +1,6 @@
 // The composing loop: plan, write each section, check, repair once, and report every step so the page
 // can show what Hermes is doing while it does it. Also the bar edit and whole-piece reshape flows.
-import { badBars, checkPiece } from './check.js'
+import { badBars, checkPiece, fitBarLength, fitChordsToStrings } from './check.js'
 import { editBars, planPiece, readBars, repairBars, reshapePiece, writeSection } from './hermes.js'
 import { INSTRUMENTS, METERS, clefFor, eighthsPerBar, pieceFromPlan, spliceBars, toAbc, withVersion } from './model.js'
 
@@ -24,6 +24,25 @@ async function checkAndRepair(ask, piece, abcjs, scope, emit, intent = '') {
     emit({ phase: 'repair-failed', error: String(e.message || e) })
   }
   issues = checkPiece(repaired, abcjs, toAbc(repaired)).filter(i => i.bar < 0 || scope.includes(i.bar))
+  // A bar that still does not add up is evened out here rather than shown broken: notes dropped from
+  // the end, then a rest for the rest of the bar.
+  // Likewise a guitar chord that still cannot be fingered loses the fewest notes it takes.
+  const short = issues.filter(i => (i.kind === 'length' || i.kind === 'range') && i.bar >= 0)
+  if (short.length) {
+    const want = eighthsPerBar(repaired.meta.meter)
+    const nextBars = [...repaired.bars]
+    for (const i of short) {
+      const bar = nextBars[i.bar]
+      const voice = repaired.voices.find(v => v.id === i.voice)
+      const fitted = i.kind === 'length'
+        ? fitBarLength(bar.notes[i.voice], want)
+        : fitChordsToStrings(bar.notes[i.voice], repaired.meta.key, voice?.instrument)
+      if (fitted !== null) nextBars[i.bar] = { ...bar, notes: { ...bar.notes, [i.voice]: fitted } }
+    }
+    repaired = { ...repaired, bars: nextBars }
+    issues = checkPiece(repaired, abcjs, toAbc(repaired)).filter(i => i.bar < 0 || scope.includes(i.bar))
+    emit({ phase: 'fitted', bars: [...new Set(short.map(i => i.bar))] })
+  }
   const still = badBars(issues)
   return { piece: repaired, fixed: bad.filter(b => !still.includes(b)), left: issues }
 }

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
-import { badBars, checkPiece, chordFitsStrings, lintBar } from '../src/music/check.js'
+import { badBars, checkPiece, chordFitsStrings, fitBarLength, fitChordsToStrings, lintBar } from '../src/music/check.js'
 import { changeBars, compose, reshape } from '../src/music/compose.js'
 import { parseJson, readBars } from '../src/music/hermes.js'
-import { FRETTED_RANGE, barLength, clefFor, dropKeyAccidentals, foldIntoRange, keyAccidentals, pieceFromPlan, restoreVersion, sectionRanges, spliceBars, tablatureFor, toAbc, withVersion } from '../src/music/model.js'
+import { FRETTED_RANGE, barLength, clefFor, courtesyAccidentals, dropKeyAccidentals, foldIntoRange, keyAccidentals, pieceFromPlan, restoreVersion, sectionRanges, spliceBars, tablatureFor, toAbc, withVersion } from '../src/music/model.js'
 
 const abcjs = createRequire(import.meta.url)('abcjs')
 
@@ -361,4 +361,32 @@ test('accidentals the key already gives are dropped, others kept as written', ()
   const piece = { ...pieceFromPlan({ ...PLAN, key: 'G' }), bars: [] }
   const [bar] = readBars({ bars: [{ V1: '"D"^f2 a2 d4', V2: '^F,8' }] }, piece, 1)
   assert.deepEqual(bar.notes, { V1: '"D"f2 a2 d4', V2: 'F,8' })
+})
+
+test('a letter that changed earlier in the bar gets its accidental written out', () => {
+  // D major: after =C, a C in another octave is C sharp again and says so.
+  assert.equal(courtesyAccidentals('[=CEG]4 [EGc]4', 'D'), '[=CEG]4 [EG^c]4')
+  assert.equal(courtesyAccidentals('^c2 C2 c2 C2', 'C'), '^c2 =C2 ^c2 =C2')
+  // Nothing to do without an earlier accidental on that letter, or when it already matches.
+  assert.equal(courtesyAccidentals('c2 C2 ^G2 ^g2', 'D'), 'c2 C2 ^G2 ^g2')
+})
+
+test('a bar that still does not add up after the repair is evened out', () => {
+  // Short: a rest fills the bar. Long: notes come off the end first.
+  assert.equal(fitBarLength('E,B, EB,E', 6), 'E,B, EB,E z')
+  assert.equal(fitBarLength('"G"A2 B2 c2 d2 e2', 8), '"G"A2 B2 c2 d2')
+  assert.equal(fitBarLength('A3 B3 c3', 8), 'A3 B3 z2')
+  assert.equal(fitBarLength('A2 B/ c4-', 8), 'A2 B/ c4 z3/2')
+  assert.equal(fitBarLength('A2 B2 c2 d/', 6), 'A2 B2 c2')
+  assert.equal(fitBarLength('(3ABc d2', 6), null)
+})
+
+test('a guitar chord that still cannot be fingered loses the fewest notes, inner ones first', () => {
+  // [^ceg] needs the B string twice; without the e it fits, and the bass and top note stay.
+  assert.equal(fitChordsToStrings('A,2 [^ceg]2 [^ceg]2', 'Dm', 'nylon guitar'), 'A,2 [^cg]2 [^cg]2')
+  // Playable chords and other instruments are left alone.
+  assert.equal(fitChordsToStrings('[G,B,DGBg]4 [CEGce]4', 'G', 'steel guitar'), '[G,B,DGBg]4 [CEGce]4')
+  assert.equal(fitChordsToStrings('[^ceg]6', 'Dm', 'piano'), '[^ceg]6')
+  // A half-step cluster keeps its outer notes.
+  assert.equal(fitChordsToStrings('[BcA]8', 'C', 'electric guitar'), '[cA]8')
 })

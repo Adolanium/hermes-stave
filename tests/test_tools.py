@@ -182,3 +182,9 @@ def test_accidentals_the_key_gives_are_dropped_like_the_page():
     piece = tools._normalise({"key": "G", "voices": [{"id": "V1", "instrument": "steel guitar"}],
                               "bars": [{"section": "A", "V1": "[DAd^f]4 [DAd^f]4"}]})
     assert piece["bars"][0]["notes"]["V1"] == "[DAdf]4 [DAdf]4"
+
+
+def test_courtesy_accidentals_like_the_page():
+    assert abc_check.courtesy_accidentals("[=CEG]4 [EGc]4", "D") == "[=CEG]4 [EG^c]4"
+    assert abc_check.courtesy_accidentals("^c2 C2 c2 C2", "C") == "^c2 =C2 ^c2 =C2"
+    assert abc_check.courtesy_accidentals("c2 C2 ^G2 ^g2", "D") == "c2 C2 ^G2 ^g2"
