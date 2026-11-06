@@ -7,6 +7,7 @@ import { instrumentOf, restoreVersion, toAbc, withVersion } from '../music/model
 import { makeAsk } from './ask.js'
 import { INBOX_EVENT } from './inbox.js'
 import { fmtTime, midiBytes, Player, barOfEvent } from './player.js'
+import { sheetPdf, sheetSvg } from './printsheet.js'
 import { Sheet } from './sheet.jsx'
 import { deletePiece, loadPieces, savePiece, setCurrent, currentId } from './store.js'
 import { CSS } from './styles.js'
@@ -79,40 +80,6 @@ function download(name, blob) {
 }
 
 /** The engraved score as a standalone, printable SVG: black ink on white, title on top, no overlays. */
-function sheetSvg(piece) {
-  const src = document.querySelector('.st-score svg')
-  if (!src) throw new Error('the score is not on screen')
-  const svg = src.cloneNode(true)
-  svg.querySelectorAll('.st-serpent-layer').forEach(n => n.remove())
-  const box = src.getBBox()
-  const pad = 40
-  const top = 90
-  const w = Math.ceil(box.x + box.width + pad)
-  const h = Math.ceil(box.y + box.height + pad + top)
-  const ns = 'http://www.w3.org/2000/svg'
-  const out = document.createElementNS(ns, 'svg')
-  out.setAttribute('xmlns', ns)
-  out.setAttribute('viewBox', `0 0 ${w} ${h}`)
-  out.setAttribute('width', String(w))
-  out.setAttribute('height', String(h))
-  const bg = document.createElementNS(ns, 'rect')
-  Object.entries({ x: 0, y: 0, width: w, height: h, fill: '#ffffff' }).forEach(([k, v]) => bg.setAttribute(k, String(v)))
-  out.appendChild(bg)
-  const title = document.createElementNS(ns, 'text')
-  Object.entries({ x: w / 2, y: 56, 'text-anchor': 'middle', 'font-family': 'Bodoni Moda, Didot, Georgia, serif', 'font-size': 34, fill: '#111' }).forEach(([k, v]) => title.setAttribute(k, String(v)))
-  title.textContent = piece.title
-  out.appendChild(title)
-  const g = document.createElementNS(ns, 'g')
-  g.setAttribute('transform', `translate(0 ${top})`)
-  svg.querySelectorAll('path, text, rect').forEach(n => {
-    n.removeAttribute('class')
-    n.setAttribute('fill', '#111')
-  })
-  ;[...svg.childNodes].forEach(n => g.appendChild(n))
-  out.appendChild(g)
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(out)}`
-}
-
 function fileName(piece, ext) {
   return `${(piece.title || 'stave').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'stave'}.${ext}`
 }
@@ -599,6 +566,8 @@ function PiecesMenu({ pieces, current, disabled, onOpen, onNew, onDelete }) {
   )
 }
 
+const PrintIcon = icons.Printer || icons.FileText
+
 function ExportMenu({ piece, player, abc, onError }) {
   const [open, setOpen] = useState(false)
   const ready = Boolean(piece && abc)
@@ -623,8 +592,11 @@ function ExportMenu({ piece, player, abc, onError }) {
           download(fileName(piece, 'wav'), blob)
         })}><icons.Volume2 size={16} /> Audio (WAV)<small>what you hear</small></button>
         <button type="button" className="st-menu-item" disabled={!ready} onClick={run(async () => {
+          download(fileName(piece, 'pdf'), new Blob([await sheetPdf(piece)], { type: 'application/pdf' }))
+        })}><PrintIcon size={16} /> Sheet music (PDF)<small>to print</small></button>
+        <button type="button" className="st-menu-item" disabled={!ready} onClick={run(async () => {
           download(fileName(piece, 'svg'), new Blob([sheetSvg(piece)], { type: 'image/svg+xml' }))
-        })}><icons.FileImage size={16} /> Sheet music (SVG)<small>to print or share</small></button>
+        })}><icons.FileImage size={16} /> Sheet music (SVG)<small>to edit or share</small></button>
         <button type="button" className="st-menu-item" disabled={!ready} onClick={run(async () => {
           download(fileName(piece, 'abc'), new Blob([abc], { type: 'text/vnd.abc' }))
         })}><icons.FileText size={16} /> ABC notation<small>plain text</small></button>
