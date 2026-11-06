@@ -15,7 +15,7 @@ Stave is a page in Hermes Desktop that engraves a piece as sheet music, plays it
 4. **Call `stave_open`** with the checked piece, the person's request as `prompt`, and a one-line `note` for the margin. It refuses a piece with problems and tells you why.
 5. **Tell the person** it is on the Stave page (sidebar: Stave), in one line, with the title. Do not paste the ABC into the chat unless they ask.
 
-When a section returns (A B A), reuse the A bars with at most a small change near the end. That keeps the form clear and saves effort.
+When a section returns (A B A), reuse the A bars with at most a small change near the end. That keeps the form clear and saves effort. The page labels a reused id "again", so `stave_check` flags a return whose melody shares fewer than half its bars with the first time. New music gets a new id (A B C).
 
 ## The data
 

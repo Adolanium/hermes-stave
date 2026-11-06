@@ -3,6 +3,7 @@ it opens on the page. A piece is plain data: meter, voices (id, clef, instrument
 each bar holds one ABC string per voice in L:1/8 (a plain note is an eighth).
 
 Each issue names the bar (1-based) and voice, so a fix can target exactly those bars.
+A section id that comes back (A B A) must bring its bars back, since the page labels it 'again'.
 """
 
 from __future__ import annotations
@@ -138,6 +139,58 @@ def check_piece(piece: dict) -> list[dict]:
             if any(p < low or p > high for p in pitches):
                 issues.append({"bar": index, "voice": vid, "kind": "range",
                                "message": f"note outside the {v.get('clef', 'treble')} range ({label})"})
+    issues.extend(_returns(bars, voices))
+    return issues
+
+
+_SOUND_SKIP = re.compile(r'"[^"]*"|![^!]*!|\s')
+
+
+def _sound(text) -> str:
+    """A bar's notes without chord symbols, decorations or spacing: what you would hear."""
+    return _SOUND_SKIP.sub("", str(text or ""))
+
+
+def _returns(bars: list, voices: list) -> list[dict]:
+    """A section id that comes back (A B A) must bring its bars back: the page labels it "again".
+
+    Each later run of an id is compared bar by bar with the first run, on the melody (the first
+    voice). At least half the bars have to match; changing the last bar or two is fine.
+    """
+    if not voices:
+        return []
+    melody = voices[0].get("id", "V1")
+    runs: list[list] = []  # [section id, first index, last index], 0-based
+    for i, bar in enumerate(bars):
+        sid = str(bar.get("section") or "") if isinstance(bar, dict) else ""
+        if runs and runs[-1][0] == sid:
+            runs[-1][2] = i
+        else:
+            runs.append([sid, i, i])
+
+    def sound(i: int) -> str:
+        bar = bars[i]
+        notes = bar.get("notes", bar) if isinstance(bar, dict) else {}
+        return _sound(notes.get(melody, ""))
+
+    first: dict[str, tuple[int, int]] = {}
+    issues: list[dict] = []
+    for sid, lo, hi in runs:
+        if not sid:
+            continue
+        if sid not in first:
+            first[sid] = (lo, hi)
+            continue
+        a_lo, a_hi = first[sid]
+        count = min(hi - lo, a_hi - a_lo) + 1
+        same = sum(sound(lo + k) == sound(a_lo + k) for k in range(count))
+        if same * 2 < count:
+            issues.append({
+                "bar": lo + 1, "voice": melody, "kind": "form",
+                "message": f"section {sid} returns at bars {lo + 1}-{hi + 1} but only {same} of {count} melody bars "
+                           f"match bars {a_lo + 1}-{a_lo + count}; repeat those bars (a change near the end is fine) "
+                           f"or give this section a new id",
+            })
     return issues
 
 

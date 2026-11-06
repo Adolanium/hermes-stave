@@ -146,7 +146,9 @@ const RENDER_OPTIONS = width => ({
 })
 
 // Engraving layout lives in ABC directives: room between systems for Hermes's margin notes.
-const LAYOUT = ['%%printtempo false', '%%staffsep 128', '%%sysstaffsep 50', '%%gchordfont "Stave Bodoni" 15', '%%voicefont Georgia 11'].join('\n')
+// %%measurenb 0: the bar number at the start of every system after the first, as engraved scores do,
+// so "bar 9" in the page and in Hermes's notes can be found at a glance.
+const LAYOUT = ['%%printtempo false', '%%staffsep 128', '%%sysstaffsep 50', '%%gchordfont "Stave Bodoni" 15', '%%voicefont Georgia 11', '%%measurenb 0', '%%measurefont "Stave Bodoni" italic 13'].join('\n')
 
 function withLayout(abc) {
   // The page shows the title in its own header; abcjs would otherwise reserve a band for it.

@@ -110,3 +110,23 @@ def test_register_wires_tools_skill_and_task():
 
     pkg.register(Ctx())
     assert calls == [("tool", "stave_check"), ("tool", "stave_open"), ("skill", "compose", True), ("task", "stave", {"reasoning_effort": "none"})]
+
+
+def test_a_returning_section_must_bring_its_bars_back():
+    a = [{"V1": '"C"E2 G2 c2 G2', "V2": "C,8"}, {"V1": '"G"D2 F2 B2 G2', "V2": "G,,8"},
+         {"V1": '"F"A2 c2 f2 c2', "V2": "F,,8"}, {"V1": '"C"c8', "V2": "C,8"}]
+    b = [{"V1": '"Am"A4 c4', "V2": "A,,8"}, {"V1": '"G"B4 G4', "V2": "G,,8"}]
+    def bars(*runs):
+        return [{"section": sid, **bar} for sid, run in runs for bar in run]
+    base = piece([])
+    # A B A with the A bars back, the chord symbols and the last bar changed: fine
+    varied = [*a[:3], {"V1": '"C"c4 z4', "V2": "C,8"}]
+    varied[0] = {**varied[0], "V1": '"Am"E2 G2 c2 G2'}
+    assert abc_check.check_piece({**base, "bars": bars(("A", a), ("B", b), ("A", varied))}) == []
+    # A B "A" with new music: flagged on the first bar of the return
+    new = [{"V1": '"Dm"d2 f2 a2 f2', "V2": "D,8"}, *a[1:2], {"V1": '"C"e2 g2 c2 e2', "V2": "C,8"}, {"V1": "f8", "V2": "F,,8"}]
+    [issue] = abc_check.check_piece({**base, "bars": bars(("A", a), ("B", b), ("A", new))})
+    assert (issue["bar"], issue["voice"], issue["kind"]) == (7, "V1", "form")
+    assert "1 of 4" in issue["message"] and "bars 1-4" in issue["message"]
+    # the same music under a new id is not a return
+    assert abc_check.check_piece({**base, "bars": bars(("A", a), ("B", b), ("C", new))}) == []

@@ -77,6 +77,7 @@ export const CSS = `
 .st-score svg .abcjs-chord{font-family:'Stave Bodoni',serif;font-weight:500;fill:var(--st-ink-3)}
 .st-score svg .abcjs-tempo,.st-score svg .abcjs-tempo path,.st-score svg .abcjs-tempo text{fill:var(--st-ink-3)}
 .st-score svg .abcjs-voice-name{fill:var(--st-ink-3);font-size:11px}
+.st-score svg .abcjs-bar-number{font-family:'Stave Bodoni',serif;font-style:italic;fill:var(--st-ink-3)}
 .st-score svg .st-lit,.st-score svg .st-lit path{fill:var(--st-pencil)!important;transition:fill .08s}
 .st-score svg .st-lit-soft,.st-score svg .st-lit-soft path{fill:color-mix(in srgb,var(--st-pencil) 45%,var(--st-ink))!important;transition:fill .08s}
 .st-loop[data-on=true]{color:var(--st-pencil);background:var(--st-pencil-faint)}
