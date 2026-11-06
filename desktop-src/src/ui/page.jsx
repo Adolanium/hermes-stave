@@ -626,9 +626,12 @@ function EmptyStaff({ planning, piece, writing, draft, setDraft, onSubmit, onPic
     const draw = () => {
       abcjs.renderAbc(el, GHOST, { add_classes: true, staffwidth: Math.max(480, el.clientWidth - 30), paddingtop: 0, paddingbottom: 0, paddingleft: 0, paddingright: 0, format: { gchordfont: 'Georgia 14 bold' } })
       if (reduceMotion()) return
+      // Each note swims in as the pencil's sweep passes its x position.
+      const svgBox = el.querySelector('svg')?.getBoundingClientRect()
       const notes = [...el.querySelectorAll('.abcjs-note, .abcjs-rest, .abcjs-beam-elem, .abcjs-chord')]
       notes.forEach((n, k) => {
-        n.style.setProperty('--st-delay', `${700 + k * 70}ms`)
+        const x = svgBox ? (n.getBoundingClientRect().left - svgBox.left) / Math.max(1, svgBox.width) : k / notes.length
+        n.style.setProperty('--st-delay', `${Math.round(250 + x * 1250)}ms`)
         n.style.setProperty('--st-dy', `${Math.sin(k * 0.85) * 10}px`)
         n.classList.add('st-slither')
       })

@@ -121,8 +121,8 @@ export const CSS = `
 .st-ghost svg .abcjs-note path,.st-ghost svg .abcjs-note,.st-ghost svg .abcjs-rest,.st-ghost svg .abcjs-beam-elem,.st-ghost svg .abcjs-chord{opacity:.32}
 .st-ghost svg .abcjs-chord{font-family:'Stave Bodoni',serif;font-weight:600}
 .st-ghost svg .st-slither{animation-duration:.9s}
-.st-ghost svg .abcjs-staff,.st-ghost svg .abcjs-staff-extra,.st-ghost svg .abcjs-bar{clip-path:inset(0 100% 0 0);animation:st-wipe 1.3s cubic-bezier(.16,1,.3,1) .1s forwards}
-@keyframes st-wipe{to{clip-path:inset(0 0 0 0)}}
+.st-ghost svg{clip-path:inset(-40px 100% -40px 0);animation:st-wipe 1.4s cubic-bezier(.45,.05,.35,1) .1s forwards}
+@keyframes st-wipe{to{clip-path:inset(-40px 0 -40px 0)}}
 .st-empty[data-planning=true] .st-ghost{opacity:.35;transition:opacity .6s}
 .st-plan{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:34px}
 .st-plan .st-note{font-size:21px}
@@ -196,7 +196,7 @@ export const CSS = `
   .st-hint{display:none}
 }
 @media (prefers-reduced-motion:reduce){
-  .st-score svg .st-slither,.st-ghost svg .st-slither,.st-note,.st-ghost svg .abcjs-staff,.st-ghost svg .abcjs-staff-extra,.st-ghost svg .abcjs-bar{animation:none!important;opacity:1;clip-path:none}
+  .st-score svg .st-slither,.st-ghost svg .st-slither,.st-note,.st-ghost svg{animation:none!important;opacity:1;clip-path:none}
   .st-serpent-body,.st-serpent-head,.st-serpent-draw{display:none}
   .st-bar[data-busy=true]{animation:none;background:var(--st-pencil-soft)}
 }
