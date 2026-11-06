@@ -107,7 +107,8 @@ export async function reshape(ask, abcjs, piece, request, emit = () => {}) {
     const rest = `z${eighthsPerBar(next.meta.meter)}`
     next = { ...next, bars: next.bars.map(b => ({ ...b, notes: Object.fromEntries(next.voices.map(v => [v.id, b.notes[v.id] || rest])) })) }
   }
-  next = { ...next, updatedAt: Date.now() }
+  // A whole-piece change overrides earlier whole-piece notes; keep only marks about specific bars.
+  next = { ...next, marks: next.marks.filter(m => m.kind === 'section' || m.kind === 'fixed' || (m.kind === 'changed' && !m.whole)), updatedAt: Date.now() }
   const note = String(reply.note || request).slice(0, 120)
   return { piece: next, note }
 }

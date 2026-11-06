@@ -22,7 +22,7 @@ export const CSS = `
   --st-ground:var(--ui-chat-surface-background,var(--ui-bg));
   --st-rule:var(--ui-stroke-tertiary);
   --st-ease:cubic-bezier(.16,1,.3,1);
-  position:relative;display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%;min-height:0;
+  position:relative;display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%;min-height:0;container-type:inline-size;container-name:stave;
   background:var(--st-ground);color:var(--st-ink);font-family:var(--font-sans);overflow:hidden
 }
 .st-page ::selection{background:var(--st-pencil-soft);color:var(--st-ink)}
@@ -64,7 +64,7 @@ export const CSS = `
 .st-tempo span{min-width:44px;text-align:center}
 
 /* ── score ─────────────────────────────────────────── */
-.st-body{position:relative;overflow:auto;overscroll-behavior:contain;padding:28px clamp(20px,4vw,56px) 40px}
+.st-body{position:relative;overflow:auto;overscroll-behavior:contain;padding:6px clamp(20px,4vw,56px) 56px;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 56px),transparent)}
 .st-score-wrap{position:relative;max-width:1180px;margin:0 auto}
 .st-score{position:relative}
 .st-score svg{display:block;overflow:visible}
@@ -74,10 +74,12 @@ export const CSS = `
 .st-score svg text{font-family:var(--font-sans)}
 .st-score svg .abcjs-title{display:none}
 .st-score svg .abcjs-part{font-family:'Stave Bodoni',serif;font-style:italic;font-weight:600;fill:var(--st-ink-2)}
-.st-score svg .abcjs-chord{font-family:'Stave Bodoni',serif;font-weight:600;fill:var(--st-ink-2)}
+.st-score svg .abcjs-chord{font-family:'Stave Bodoni',serif;font-weight:500;fill:var(--st-ink-3)}
 .st-score svg .abcjs-tempo,.st-score svg .abcjs-tempo path,.st-score svg .abcjs-tempo text{fill:var(--st-ink-3)}
 .st-score svg .abcjs-voice-name{fill:var(--st-ink-3);font-size:11px}
 .st-score svg .st-lit,.st-score svg .st-lit path{fill:var(--st-pencil)!important;transition:fill .08s}
+.st-score svg .st-lit-soft,.st-score svg .st-lit-soft path{fill:color-mix(in srgb,var(--st-pencil) 45%,var(--st-ink))!important;transition:fill .08s}
+.st-loop[data-on=true]{color:var(--st-pencil);background:var(--st-pencil-faint)}
 
 /* slither: notes swim onto the staff in a travelling wave, a bar at a time */
 .st-score svg .st-slither{transform-box:fill-box;transform-origin:center;opacity:0;animation:st-slither .62s var(--st-ease) forwards;animation-delay:var(--st-delay,0ms)}
@@ -119,6 +121,8 @@ export const CSS = `
 .st-ghost svg .abcjs-note path,.st-ghost svg .abcjs-note,.st-ghost svg .abcjs-rest,.st-ghost svg .abcjs-beam-elem,.st-ghost svg .abcjs-chord{opacity:.32}
 .st-ghost svg .abcjs-chord{font-family:'Stave Bodoni',serif;font-weight:600}
 .st-ghost svg .st-slither{animation-duration:.9s}
+.st-ghost svg .abcjs-staff,.st-ghost svg .abcjs-staff-extra,.st-ghost svg .abcjs-bar{clip-path:inset(0 100% 0 0);animation:st-wipe 1.3s cubic-bezier(.16,1,.3,1) .1s forwards}
+@keyframes st-wipe{to{clip-path:inset(0 0 0 0)}}
 .st-empty[data-planning=true] .st-ghost{opacity:.35;transition:opacity .6s}
 .st-plan{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:34px}
 .st-plan .st-note{font-size:21px}
@@ -127,8 +131,6 @@ export const CSS = `
 .st-empty{min-height:100%;display:grid;align-content:center;justify-items:center;gap:30px;padding:40px 0 60px}
 .st-empty h2{font-family:'Stave Bodoni',serif;font-style:italic;font-weight:500;font-size:clamp(28px,3.4vw,44px);letter-spacing:-.02em;margin:0;text-align:center}
 .st-empty-staff{position:relative;width:min(980px,100%)}
-@keyframes st-draw{to{stroke-dashoffset:0}}
-@keyframes st-fade{to{opacity:1}}
 .st-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 22px;max-width:820px}
 .st-chip{font-family:'Stave Pencil',cursive;font-size:17px;color:var(--st-ink-2);background:none;border:0;padding:2px 2px;cursor:pointer;position:relative;transition:color .15s}
 .st-chip:hover{color:var(--st-pencil)}
@@ -139,10 +141,10 @@ export const CSS = `
 .st-foot{padding:10px clamp(20px,4vw,56px) 18px}
 .st-ask{position:relative;max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:8px;min-height:50px;padding:6px 6px 6px 14px;border-radius:14px;background:var(--ui-bg-secondary,var(--ui-surface-background));border:1px solid var(--st-rule);transition:border-color .2s,box-shadow .2s}
 .st-ask:focus-within{border-color:color-mix(in srgb,var(--st-pencil) 55%,var(--st-rule));box-shadow:0 0 0 4px var(--st-pencil-faint)}
-.st-ask[data-big=true]{min-height:62px;border-radius:16px;padding-left:20px;background:var(--st-ground);box-shadow:0 18px 50px -24px color-mix(in srgb,var(--st-ink) 40%,transparent)}
+.st-ask[data-big=true]{min-height:62px;border-radius:16px;padding-left:20px;background:var(--st-ground)}
 .st-ask input{flex:1;min-width:0;height:36px;border:0;outline:0;background:transparent;color:var(--st-ink);font:inherit;font-size:14.5px;caret-color:var(--st-pencil)}
 .st-ask[data-big=true] input{font-family:'Stave Bodoni',serif;font-style:italic;font-size:21px}
-.st-ask input::placeholder{color:var(--st-ink-4)}
+.st-ask input::placeholder{color:var(--st-ink-3)}
 .st-scope{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 4px 0 10px;border-radius:8px;background:var(--st-pencil-soft);color:var(--st-pencil);font-size:12.5px;font-weight:500;white-space:nowrap}
 .st-scope button{display:grid;place-items:center;width:20px;height:20px;border:0;border-radius:5px;background:transparent;color:inherit;cursor:pointer}
 .st-scope button:hover{background:var(--st-pencil-soft)}
@@ -160,7 +162,7 @@ export const CSS = `
 @keyframes st-pulse{50%{opacity:.4}}
 .st-error{max-width:1180px;margin:0 auto 8px;font-family:'Stave Pencil',cursive;font-size:15px;color:var(--ui-red);display:flex;gap:12px;align-items:baseline}
 .st-error button{font:inherit;font-family:var(--font-sans);font-size:12.5px;color:var(--st-ink-2);background:none;border:0;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.st-hint{max-width:1180px;margin:0 auto 8px;font-size:12px;color:var(--st-ink-4);display:flex;gap:16px}
+.st-hint{max-width:1180px;margin:0 auto 8px;font-size:12px;color:var(--st-ink-3);display:flex;gap:16px}
 .st-hint kbd{font-family:var(--font-mono);font-size:11px;padding:1px 5px;border-radius:4px;border:1px solid var(--st-rule);color:var(--st-ink-3)}
 
 /* ── pieces & export menus ──────────────────────────── */
@@ -181,13 +183,20 @@ export const CSS = `
 
 @keyframes st-spin{to{transform:rotate(360deg)}}
 
-@media (max-width:760px){
-  .st-head{flex-wrap:wrap;align-items:center}
-  .st-transport{border-left:0;margin-left:0;padding-left:0}
+/* The page column, not the window, decides: Desktop's sidebars take their share first. */
+@container stave (max-width:1080px){
   .st-scrub{display:none}
+  .st-tools .st-iconbtn .st-label{display:none}
+}
+@container stave (max-width:860px){
+  .st-head{flex-wrap:wrap;align-items:center;row-gap:14px}
+  .st-titles{flex-basis:100%}
+  .st-tools{flex:1;justify-content:flex-start}
+  .st-transport{margin-left:auto}
+  .st-hint{display:none}
 }
 @media (prefers-reduced-motion:reduce){
-  .st-score svg .st-slither,.st-ghost svg .st-slither,.st-note{animation:none!important;opacity:1}
+  .st-score svg .st-slither,.st-ghost svg .st-slither,.st-note,.st-ghost svg .abcjs-staff,.st-ghost svg .abcjs-staff-extra,.st-ghost svg .abcjs-bar{animation:none!important;opacity:1;clip-path:none}
   .st-serpent-body,.st-serpent-head,.st-serpent-draw{display:none}
   .st-bar[data-busy=true]{animation:none;background:var(--st-pencil-soft)}
 }

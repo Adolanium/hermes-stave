@@ -43,6 +43,15 @@ function UndoIcon() {
   )
 }
 
+function LoopIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12V9a3 3 0 0 1 3-3h13l-3-3" />
+      <path d="M20 12v3a3 3 0 0 1-3 3H4l3 3" />
+    </svg>
+  )
+}
+
 function MinusIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 12h12" /></svg>
@@ -66,6 +75,41 @@ function download(name, blob) {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 4000)
+}
+
+/** The engraved score as a standalone, printable SVG: black ink on white, title on top, no overlays. */
+function sheetSvg(piece) {
+  const src = document.querySelector('.st-score svg')
+  if (!src) throw new Error('the score is not on screen')
+  const svg = src.cloneNode(true)
+  svg.querySelectorAll('.st-serpent-layer').forEach(n => n.remove())
+  const box = src.getBBox()
+  const pad = 40
+  const top = 90
+  const w = Math.ceil(box.x + box.width + pad)
+  const h = Math.ceil(box.y + box.height + pad + top)
+  const ns = 'http://www.w3.org/2000/svg'
+  const out = document.createElementNS(ns, 'svg')
+  out.setAttribute('xmlns', ns)
+  out.setAttribute('viewBox', `0 0 ${w} ${h}`)
+  out.setAttribute('width', String(w))
+  out.setAttribute('height', String(h))
+  const bg = document.createElementNS(ns, 'rect')
+  Object.entries({ x: 0, y: 0, width: w, height: h, fill: '#ffffff' }).forEach(([k, v]) => bg.setAttribute(k, String(v)))
+  out.appendChild(bg)
+  const title = document.createElementNS(ns, 'text')
+  Object.entries({ x: w / 2, y: 56, 'text-anchor': 'middle', 'font-family': 'Bodoni Moda, Didot, Georgia, serif', 'font-size': 34, fill: '#111' }).forEach(([k, v]) => title.setAttribute(k, String(v)))
+  title.textContent = piece.title
+  out.appendChild(title)
+  const g = document.createElementNS(ns, 'g')
+  g.setAttribute('transform', `translate(0 ${top})`)
+  svg.querySelectorAll('path, text, rect').forEach(n => {
+    n.removeAttribute('class')
+    n.setAttribute('fill', '#111')
+  })
+  ;[...svg.childNodes].forEach(n => g.appendChild(n))
+  out.appendChild(g)
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(out)}`
 }
 
 function fileName(piece, ext) {
@@ -157,6 +201,7 @@ export function StavePage({ storage }) {
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
   const [draft, setDraft] = useState('')
+  const [looping, setLooping] = useState(false)
   const [useChatModel, setUseChatModel] = useState(() => storage.get('useChatModel', true) !== false)
   const chatModelRef = useRef(useChatModel)
   chatModelRef.current = useChatModel
@@ -316,6 +361,16 @@ export function StavePage({ storage }) {
     return () => cancelAnimationFrame(id)
   }, [slither?.key])
 
+  // Loop the selection when there is one, the whole piece otherwise.
+  useEffect(() => {
+    if (!looping) return player.setLoop(null)
+    if (selection) {
+      const from = player.barStart(selection.from)
+      const next = selection.to + 1 < (piece?.bars.length || 0) ? player.barStart(selection.to + 1) : player.duration
+      player.setLoop({ from, to: next > from ? next : player.duration })
+    } else player.setLoop({ from: 0, to: player.duration })
+  }, [looping, selection?.from, selection?.to, abc, player.duration])
+
   const position = player.position()
   const event = player.playing ? player.eventAt(position) : null
   const bar = event ? barOfEvent(event) : -1
@@ -347,9 +402,9 @@ export function StavePage({ storage }) {
         </div>
         <div className="st-tools">
           <PiecesMenu pieces={pieces} current={piece} disabled={working} onOpen={openPiece} onNew={() => openPiece(null)} onDelete={id => { setPieces(deletePiece(storage, id)); if (piece?.id === id) openPiece(null) }} />
-          <button type="button" className="st-iconbtn" onClick={undo} disabled={!piece || !canUndo(piece) || working} title="Undo the last change (⌘Z)" aria-label="Undo the last change"><UndoIcon /></button>
+          {abc && <button type="button" className="st-iconbtn" onClick={undo} disabled={!canUndo(piece) || working} title="Undo the last change (⌘Z)" aria-label="Undo the last change"><UndoIcon /></button>}
           <ExportMenu piece={piece} player={player} abc={abc} useChatModel={useChatModel} onUseChatModel={v => { setUseChatModel(v); storage.set('useChatModel', v) }} onError={setError} />
-          <div className="st-transport">
+          {abc && <div className="st-transport">
             <button type="button" className="st-play" onClick={togglePlay} disabled={!abc || working} data-loading={player.isLoading ? 'true' : 'false'} aria-label={player.playing ? 'Pause' : 'Play'} title={player.playing ? 'Pause (Space)' : 'Play (Space)'}>
               <PlayGlyph playing={player.playing} />
             </button>
@@ -360,10 +415,11 @@ export function StavePage({ storage }) {
             <Scrubber player={player} />
             <div className="st-tempo" aria-label="Tempo">
               <button type="button" className="st-iconbtn" onClick={() => setTempo(-8)} disabled={!piece || working} aria-label="Slower"><MinusIcon /></button>
-              <span>♩ {piece ? piece.meta.tempo : '—'}</span>
+              <span>{piece.meta.meter === '6/8' ? '♩.' : '♩'} {piece.meta.tempo}</span>
               <button type="button" className="st-iconbtn" onClick={() => setTempo(8)} disabled={!piece || working} aria-label="Faster"><icons.Plus size={16} /></button>
             </div>
-          </div>
+            <button type="button" className="st-iconbtn st-loop" aria-pressed={looping} data-on={looping ? 'true' : 'false'} onClick={() => setLooping(v => !v)} title={selection ? 'Loop the selected bars' : 'Loop the piece'} aria-label={selection ? 'Loop the selected bars' : 'Loop the piece'}><LoopIcon /></button>
+          </div>}
         </div>
       </header>
 
@@ -496,7 +552,7 @@ function PiecesMenu({ pieces, current, disabled, onOpen, onNew, onDelete }) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button type="button" className="st-iconbtn" disabled={disabled} aria-label="Your pieces">
-          <icons.NotebookTabs size={16} /> Pieces
+          <icons.NotebookTabs size={16} /> <span className="st-label">Pieces</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="st-menu">
@@ -541,6 +597,9 @@ function ExportMenu({ piece, player, abc, useChatModel, onUseChatModel, onError 
           download(fileName(piece, 'wav'), blob)
         })}><icons.Volume2 size={16} /> Audio (WAV)<small>what you hear</small></button>
         <button type="button" className="st-menu-item" disabled={!ready} onClick={run(async () => {
+          download(fileName(piece, 'svg'), new Blob([sheetSvg(piece)], { type: 'image/svg+xml' }))
+        })}><icons.FileImage size={16} /> Sheet music (SVG)<small>to print or share</small></button>
+        <button type="button" className="st-menu-item" disabled={!ready} onClick={run(async () => {
           download(fileName(piece, 'abc'), new Blob([abc], { type: 'text/vnd.abc' }))
         })}><icons.FileText size={16} /> ABC notation<small>plain text</small></button>
         <button type="button" className="st-menu-item" disabled={!ready} onClick={run(async () => { await writeClipboardText(abc) })}><icons.Copy size={16} /> Copy ABC</button>
@@ -582,7 +641,7 @@ function EmptyStaff({ planning, piece, writing, draft, setDraft, onSubmit, onPic
   const plan = piece?.sections || []
   return (
     <div className="st-empty" data-planning={planning ? 'true' : 'false'}>
-      <h2>{planning ? (piece ? piece.title : 'Listening…') : 'What should it sound like?'}</h2>
+      <h2>{planning ? (piece?.meta.mood ? `${piece.meta.mood.charAt(0).toUpperCase()}${piece.meta.mood.slice(1)}` : 'Listening…') : 'What should it sound like?'}</h2>
       <div className="st-empty-staff">
         <div ref={staffRef} className="st-ghost" aria-hidden="true" />
         {planning && (

@@ -11,7 +11,8 @@ Hermes writes notes, not audio. Every note is on the page, so you can read it, h
 - **Plays it.** Press play or Space. The notes light up as they sound, and a line runs along the melody so you can follow it without reading music. The page scrolls with the music.
 - **Changes what you point at.** Click a bar, drag across several, or Shift-click, then say what you want: "sadder", "end on a long note", "simpler bass". Hermes rewrites only those bars and notes what it changed in the margin. With nothing selected, a request applies to the whole piece: "slower", "on strings", "in A minor", "make it longer".
 - **Undoes anything.** Every change keeps a snapshot. Undo with the arrow button or Cmd/Ctrl+Z.
-- **Exports.** MIDI for any music app, WAV of what you hear, or the ABC text.
+- **Loops.** The loop button repeats the selected bars, or the whole piece when nothing is selected.
+- **Exports.** MIDI for any music app, WAV of what you hear, the engraved score as an SVG you can print, or the ABC text.
 - **Keeps your pieces.** The Pieces menu lists everything you have written on this machine.
 
 ## How Hermes is used

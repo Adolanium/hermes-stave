@@ -24,6 +24,13 @@ export class Player {
     this.offset = 0 // seconds, while paused
     this.listeners = new Set()
     this.loading = null
+    this.loop = null // { from, to } in seconds, or null
+  }
+
+  /** Loop [from, to] seconds while playing; null plays once. */
+  setLoop(range) {
+    this.loop = range
+    this.emit()
   }
 
   on(fn) {
@@ -88,7 +95,12 @@ export class Player {
   position() {
     if (this.playing && this.synth?.startTimeSec !== undefined) {
       const t = audioContext().currentTime - this.synth.startTimeSec
-      if (t >= this.duration - 0.05) {
+      const end = this.loop ? Math.min(this.loop.to, this.duration - 0.05) : this.duration - 0.05
+      if (t >= end) {
+        if (this.loop) {
+          this.synth.seek(this.loop.from, 'seconds')
+          return this.loop.from
+        }
         this.finish()
         return this.duration
       }

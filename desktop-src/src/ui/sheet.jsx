@@ -138,7 +138,7 @@ function rangeBoxes(boxes, from, to) {
 const RENDER_OPTIONS = width => ({
   add_classes: true,
   staffwidth: Math.max(520, width - 40),
-  paddingtop: 36,
+  paddingtop: 30,
   paddingbottom: 10,
   paddingleft: 4,
   paddingright: 24,
@@ -146,10 +146,11 @@ const RENDER_OPTIONS = width => ({
 })
 
 // Engraving layout lives in ABC directives: room between systems for Hermes's margin notes.
-const LAYOUT = ['%%staffsep 128', '%%sysstaffsep 50', '%%gchordfont Georgia 15 bold', '%%voicefont Georgia 11'].join('\n')
+const LAYOUT = ['%%printtempo false', '%%staffsep 128', '%%sysstaffsep 50', '%%gchordfont "Stave Bodoni" 15', '%%voicefont Georgia 11'].join('\n')
 
 function withLayout(abc) {
-  return abc.replace(/^X:1\n/, `X:1\n${LAYOUT}\n`)
+  // The page shows the title in its own header; abcjs would otherwise reserve a band for it.
+  return abc.replace(/^X:1\n/, `X:1\n${LAYOUT}\n`).replace(/^T:.*\n/m, '')
 }
 
 /**
@@ -207,7 +208,12 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
     head.setAttribute('r', '4.2')
     head.setAttribute('class', 'st-serpent-head')
     layer.appendChild(head)
-    geom.current = { svg, melody, head, layer, visual }
+    // The melody's own SVG elements, so playback can light it brighter than the accompaniment.
+    const melodyEls = new Set()
+    for (const line of visual.lines) {
+      for (const el of line.staff?.[0]?.voices?.[0] || []) for (const node of el.abselem?.elemset || []) melodyEls.add(node)
+    }
+    geom.current = { svg, melody, head, layer, visual, melodyEls }
     setBoxes(barBoxes(svg, hostRef.current, barCount))
     setRenderKey(k => k + 1)
     onVisual?.(visual)
@@ -226,16 +232,18 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
       })
     }
     els.sort((a, b) => a.bar - b.bar || a.x - b.x)
+    // One wave, never longer than ~1.6 s however many notes arrive.
+    const step = Math.min(22, 1600 / Math.max(1, els.length))
     els.forEach(({ el }, k) => {
       el.classList.remove('st-slither')
       void el.getBoundingClientRect()
-      el.style.setProperty('--st-delay', `${k * 22}ms`)
+      el.style.setProperty('--st-delay', `${Math.round(k * step)}ms`)
       el.style.setProperty('--st-dy', `${Math.sin(k * 0.85) * 9}px`)
       el.classList.add('st-slither')
     })
     // The pencil draws the melody of the new bars as they arrive, then lifts.
     const draws = []
-    const span = els.length * 22 + 620
+    const span = els.length * step + 620
     for (const l of melody) {
       const idx = l.points.map((p, i) => i).filter(i => {
         const bar = barAtStartChar(geom.current.visual, l.points[i].startChar)
@@ -337,7 +345,7 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
     }
     const clear = () => {
       followed = -1
-      lit.forEach(el => el.classList.remove('st-lit'))
+      lit.forEach(el => el.classList.remove('st-lit', 'st-lit-soft'))
       lit = []
       const g = geom.current
       g.melody?.forEach(l => { l.body.dataset.on = 'false' })
@@ -354,8 +362,8 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
       const ev = player.eventAt(t)
       const els = ev ? ev.elements.flat().filter(Boolean) : []
       if (els[0] !== lit[0]) {
-        lit.forEach(el => el.classList.remove('st-lit'))
-        els.forEach(el => el.classList.add('st-lit'))
+        lit.forEach(el => el.classList.remove('st-lit', 'st-lit-soft'))
+        els.forEach(el => el.classList.add(g.melodyEls?.has(el) ? 'st-lit' : 'st-lit-soft'))
         lit = els
       }
       // Serpent: interpolate between melody notes by time.
