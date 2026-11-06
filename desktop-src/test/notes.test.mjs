@@ -197,6 +197,8 @@ test('every TAB fret is the note on the staff, on its own string', () => {
       const s = line.staff?.[staff]
       if (!s) continue
       strings.accidentals = s.key?.accidentals || []
+      // As abcjs's TAB renderer does: an octave clef shifts what each written note means.
+      strings.clefTranspose = /-8/.test(s.clef?.type || '') ? -12 : 0
       for (const el of s.voices[0]) {
         if (el.el_type === 'bar') strings.measureAccidentals = {}
         if (el.el_type !== 'note') continue
@@ -205,8 +207,10 @@ test('every TAB fret is the note on the staff, on its own string', () => {
           assert.equal(new Set(placed.map(n => n.str)).size, placed.length, `one string per note at ${t}`)
           for (const n of placed) {
             assert.notEqual(n.num, '?', `a fret for every note at ${t}`)
-            // Fret plus the open string, in the TAB's own (sounding) octave, back to written pitch.
-            fromTab.push({ start: t, pitch: strings.stringPitches[strings.stringPitches.length - 1 - n.str] + n.num + 12 })
+            // The open string plus the fret is the sounding note (abcjs counts an octave lower than
+            // MIDI, hence +12); undo the clef's octave to get back to the written note.
+            const sounding = strings.stringPitches[strings.stringPitches.length - 1 - n.str] + n.num + 12
+            fromTab.push({ start: t, pitch: sounding - strings.clefTranspose })
           }
         }
         t += el.duration * 4

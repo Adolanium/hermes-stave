@@ -255,12 +255,13 @@ test('guitar parts get a treble clef, TAB under them, and sound an octave below 
   assert.equal(clefFor('electric guitar', 'bass'), 'treble')
   const tabs = tablatureFor(piece)
   assert.deepEqual(tabs.map(t => t.instrument), ['', 'guitar', 'guitar'])
-  assert.deepEqual(tabs[1].tuning, ['E,', 'A,', 'D', 'G', 'B', 'e'])
+  assert.deepEqual(tabs[1].tuning, ['E,,', 'A,,', 'D,', 'G,', 'B,', 'E'])
   assert.deepEqual(tabs[2].tuning, ['E,,', 'A,,', 'D,', 'G,'])
   assert.equal(tablatureFor(pieceFromPlan(PLAN)), undefined)
 
   const abc = toAbc({ ...piece, bars: [{ section: 'A', notes: { V1: 'c8', V2: '[G,B,DGB]8', V3: 'G,,8' } }] })
-  assert.match(abc, /V:V2 clef=treble name="Acoustic guitar"/)
+  assert.match(abc, /V:V2 clef=treble-8 name="Acoustic guitar"/)
+  assert.match(abc, /V:V3 clef=bass name="Bass guitar"/)
   assert.equal(abcjs.parseOnly(abc)[0].warnings, undefined)
   // What the synth plays: each part on its own instrument, fretted parts an octave below how they
   // are written (G, is G3 on paper and G2, MIDI 43, in sound).

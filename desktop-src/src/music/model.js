@@ -31,12 +31,20 @@ export const INSTRUMENTS = {
 
 /**
  * Fretted instruments get a TAB staff under their notes. Like printed guitar music, their parts are
- * written an octave above how they sound (guitar on a treble staff, bass guitar on a bass staff),
- * so the tunings below are written pitches and playback drops these parts an octave.
+ * written an octave above how they sound, and playback drops them an octave. Guitar shows that with
+ * the octave treble clef (the small 8 under it); abcjs's TAB reads that clef as an octave down, so the
+ * guitar tuning here is written an octave lower to match. Bass guitar keeps the plain bass clef, the
+ * usual convention, and its tuning is given as written.
  */
 export const TAB_TUNINGS = {
-  guitar: ['E,', 'A,', 'D', 'G', 'B', 'e'],
+  guitar: ['E,,', 'A,,', 'D,', 'G,', 'B,', 'E'],
   bass: ['E,,', 'A,,', 'D,', 'G,']
+}
+
+/** The clef as printed: guitar gets the octave treble clef; everything else as stored. */
+function printedClef(voice) {
+  if (instrumentOf(voice.instrument).tab === 'guitar') return 'treble-8'
+  return voice.clef === 'bass' ? 'bass' : 'treble'
 }
 
 /** Written range of fretted parts, in abcjs diatonic steps (C = 0): E, to e' and E,, to G. */
@@ -202,7 +210,7 @@ export function toAbc(piece, { tempo } = {}) {
   lines.push(`%%score ${ids.length > 1 ? `[${ids.join(' ')}]` : ids[0]}`)
   lines.push('%%MIDI chordvol 46', '%%MIDI bassvol 0')
   for (const v of piece.voices) {
-    lines.push(`V:${v.id} clef=${v.clef === 'bass' ? 'bass' : 'treble'} name="${instrumentOf(v.instrument).label}" snm=""`)
+    lines.push(`V:${v.id} clef=${printedClef(v)} name="${instrumentOf(v.instrument).label}" snm=""`)
   }
   const perLine = meta.meter === '4/4' ? 4 : 6
   for (let start = 0; start < piece.bars.length; start += perLine) {
