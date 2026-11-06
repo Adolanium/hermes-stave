@@ -319,6 +319,10 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
           note.style.setProperty('--st-delay', fresh && animate ? `${400 + k * 60}ms` : '0ms')
           note.textContent = m.text
           overlay.appendChild(note)
+          // Keep the note on the page: a note near the right edge ends where its bars end.
+          const room = overlay.clientWidth - 8
+          const width = note.getBoundingClientRect().width
+          if (b.x + 4 + width > room) note.style.left = `${Math.max(0, Math.min(b.x + b.w, room) - width)}px`
         }
       }
     })
