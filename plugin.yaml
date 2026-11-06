@@ -1,6 +1,6 @@
 name: stave
 version: "0.1.0"
-description: "Describe a piece of music and Hermes writes it as sheet music: the page engraves the score, plays it with the sounding notes lit, and changes any bars you pick when you ask in words."
+description: "Describe a piece of music and Hermes writes it as sheet music: a Desktop page engraves the score, plays it with the sounding notes lit, and changes any bars you pick when you ask in words. The agent can compose from any chat with the stave:compose skill and open pieces on the page."
 author: Adolanium
 license: MIT
 homepage: https://github.com/Adolanium/hermes-stave
@@ -8,7 +8,9 @@ manifest_version: 1
 kind: standalone
 requires_hermes: ">=0.22.6"
 
-provides_tools: []
+provides_tools:
+  - stave_check  # checks a piece's bars, ranges and ABC (tools.py)
+  - stave_open   # opens a checked piece on the Stave page (tools.py)
 provides_hooks: []
 provides_middleware: []
 requires_env: []

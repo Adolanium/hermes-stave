@@ -1,6 +1,8 @@
 // Stave — describe a piece of music and Hermes writes it as sheet music. A Desktop page (route, sidebar
-// row, palette command); Hermes is reached through llm.oneshot, nothing runs in the gateway.
+// row, palette command) that composes through llm.oneshot, plus a poll of the plugin's inbox, where
+// pieces the agent opened from a chat with the stave_open tool wait for the page.
 import { host, PALETTE_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA } from '@hermes/plugin-sdk'
+import { watchInbox } from './ui/inbox.js'
 import { StavePage } from './ui/page.jsx'
 
 const PATH = '/stave'
@@ -9,6 +11,11 @@ export default {
   id: 'stave',
   name: 'Stave',
   register(ctx) {
+    const rest = (route, opts) => ctx.rest(route, opts)
+    if (typeof ctx.rest === 'function') {
+      const stop = watchInbox({ rest, storage: ctx.storage, path: PATH })
+      ctx.onDispose?.(stop)
+    }
     ctx.registerMany([
       {
         id: 'page',

@@ -176,3 +176,50 @@ export function barsText(piece, from = 0, to = piece.bars.length - 1) {
   }
   return rows.join('\n')
 }
+
+/**
+ * A piece the agent opened with stave_open (already checked on the Python side) as a page piece:
+ * section lengths and marks are derived from its bars.
+ */
+export function pieceFromAgent(entry) {
+  const voices = (entry.voices || []).slice(0, 3).map((v, i) => ({
+    id: `V${i + 1}`,
+    name: String(v.name || (i === 0 ? 'Melody' : 'Part')).slice(0, 24),
+    instrument: INSTRUMENTS[String(v.instrument || '').toLowerCase()] ? String(v.instrument).toLowerCase() : 'piano',
+    clef: v.clef === 'bass' ? 'bass' : 'treble'
+  }))
+  const bars = (entry.bars || []).map(b => ({
+    section: String(b.section || 'A').slice(0, 3),
+    notes: Object.fromEntries(voices.map(v => [v.id, String(b.notes?.[v.id] ?? '')]))
+  }))
+  const names = new Map((entry.sections || []).map(s => [String(s.id), String(s.name || '')]))
+  const piece = {
+    id: newId(),
+    title: cleanTitle(entry.title),
+    prompt: String(entry.prompt || ''),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    meta: {
+      key: KEY_RE.test(String(entry.key || '')) ? String(entry.key) : 'C',
+      meter: METERS.includes(entry.meter) ? entry.meter : '4/4',
+      tempo: Math.max(40, Math.min(200, Math.round(Number(entry.tempo) || 100))),
+      mood: String(entry.mood || '').slice(0, 80)
+    },
+    voices,
+    sections: [],
+    bars,
+    marks: [],
+    versions: [],
+    from: 'chat'
+  }
+  const seen = new Set()
+  for (const r of sectionRanges(piece)) {
+    const name = names.get(r.id) || ''
+    piece.sections.push({ id: r.id, name, bars: r.to - r.from + 1, chords: [], idea: '' })
+    const label = name ? `${r.id} · ${name.toLowerCase()}` : `section ${r.id}`
+    piece.marks.push({ kind: 'section', from: r.from, to: r.to, text: seen.has(r.id) ? `${label}, again` : label, at: Date.now() })
+    seen.add(r.id)
+  }
+  if (entry.note) piece.marks.push({ kind: 'piece', from: 0, to: 0, text: String(entry.note).slice(0, 120), at: Date.now() })
+  return withVersion(piece, 'Written in chat')
+}

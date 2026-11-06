@@ -179,6 +179,8 @@ export const CSS = `
 .st-menu-item:hover{background:var(--ui-row-hover-background)}
 .st-menu-item svg{width:16px;height:16px;color:var(--st-ink-3)}
 .st-menu-item small{margin-left:auto;font-size:11.5px;color:var(--st-ink-4)}
+.st-menu-note{padding:10px 10px 6px;margin-top:6px;border-top:1px solid var(--st-rule);font-size:12px;line-height:1.45;color:var(--st-ink-3)}
+.st-menu-note b{font-weight:500;color:var(--st-ink-2)}
 .st-menu-empty{padding:18px 10px;font-family:'Stave Pencil',cursive;font-size:15px;color:var(--st-ink-3);text-align:center}
 
 @keyframes st-spin{to{transform:rotate(360deg)}}

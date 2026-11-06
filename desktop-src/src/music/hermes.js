@@ -87,10 +87,13 @@ export async function planPiece(ask, prompt) {
 
 /** Write `section` (an entry of piece.sections, with its own bar count) after the bars already written. */
 export async function writeSection(ask, piece, section) {
-  const before = piece.bars.length ? `Bars written so far:\n${barsText(piece)}` : 'Nothing written yet; this is the opening.'
+  const opening = piece.sections[0]?.id === section.id
+  const before = piece.bars.length
+    ? `Bars written so far:\n${barsText(piece)}`
+    : opening ? 'This is the opening: state the motif clearly.' : `The other sections are being written at the same time from the same plan. Make this section's motif grow from the idea of section ${piece.sections[0]?.id}, and contrast as the plan says.`
   const earlier = piece.bars.some(b => b.section === section.id) ? `This is a return of section ${section.id}: reuse those bars with a small variation.` : ''
   const input = `${describe(piece)}\n\nForm: ${piece.sections.map(s => `${s.id} "${s.name}" ${s.bars} bars, chords ${s.chords.join(' | ')}: ${s.idea}`).join('\n')}\n\n${before}\n\nNow write section ${section.id} "${section.name}": ${section.bars} bars, numbered ${piece.bars.length + 1} to ${piece.bars.length + section.bars}.\nChords, one entry per bar: ${section.chords.join(' | ') || 'your choice'}\nIdea: ${section.idea}\n${earlier}`
-  const text = await ask(SECTION_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: 1600, temperature: 0.7 })
+  const text = await ask(SECTION_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: replyBudget(piece, section.bars), temperature: 0.7 })
   return readBars(parseJson(text), piece, section.bars)
 }
 
@@ -101,15 +104,27 @@ export async function repairBars(ask, piece, indexes, issues) {
     return `${barsText(piece, i, i)}   <- ${problems}`
   })
   const input = `${describe(piece)}\n\nWhole piece for context:\n${barsText(piece)}\n\nFix these ${indexes.length} bars, in this order:\n${rows.join('\n')}`
-  const text = await ask(REPAIR_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: 1400, temperature: 0.2 })
+  const text = await ask(REPAIR_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: replyBudget(piece, indexes.length), temperature: 0.2 })
   return readBars(parseJson(text), piece, indexes.length)
 }
 
-/** Rewrite bars [from, to] (0-based, inclusive) as the person asked. Returns { bars, note }. */
+/** Tokens a reply of `bars` bars needs: about 45 per voice per bar, plus room for the JSON. */
+export function replyBudget(piece, bars) {
+  return Math.min(3200, 260 + bars * piece.voices.length * 45)
+}
+
+/**
+ * Rewrite bars [from, to] (0-based, inclusive) as the person asked. Returns { bars, note }.
+ * Only the neighbourhood travels (four bars either side, plus the form): a smaller prompt and a
+ * reply sized to the selection keep a bar edit quick.
+ */
 export async function editBars(ask, piece, from, to, request) {
   const count = to - from + 1
-  const input = `${describe(piece)}\n\nWhole piece:\n${barsText(piece)}\n\nSelected: bars ${from + 1} to ${to + 1} (${count} bars).\nThe person said: ${request}`
-  const text = await ask(EDIT_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: 1400, temperature: 0.6 })
+  const lo = Math.max(0, from - 4)
+  const hi = Math.min(piece.bars.length - 1, to + 4)
+  const form = piece.sections.map(s => `${s.id} "${s.name}"`).join(', ')
+  const input = `${describe(piece)}\nForm: ${form}; ${piece.bars.length} bars in all.\n\nBars ${lo + 1} to ${hi + 1}, around the selection:\n${barsText(piece, lo, hi)}\n\nSelected: bars ${from + 1} to ${to + 1} (${count} bars).\nThe person said: ${request}`
+  const text = await ask(EDIT_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: replyBudget(piece, count) + 60, temperature: 0.6 })
   const reply = parseJson(text)
   return { bars: readBars(reply, piece, count), note: String(reply.note || '').slice(0, 120) }
 }

@@ -105,12 +105,18 @@ test('readBars insists on the bar count and strips stray bar lines', () => {
 
 test('compose plans, writes each section, repairs a broken bar once, and marks it', async () => {
   const brokenA = A.map((b, i) => (i === 2 ? { ...b, V1: '"C"c2 e2 d2' } : b))
-  const { ask, calls } = cannedAsk([PLAN, { bars: brokenA }, { bars: [A[2]] }, { bars: B }])
+  const calls = []
+  const ask = async (instructions, input) => {
+    calls.push({ instructions, input })
+    if (instructions.startsWith('You are the composer')) return JSON.stringify(PLAN)
+    if (instructions.startsWith('You fix bars')) return JSON.stringify({ bars: [A[2]] })
+    return JSON.stringify({ bars: /Now write section A/.test(input) ? brokenA : B })
+  }
   const events = []
   const piece = await compose(ask, abcjs, 'a happy song', e => events.push(e.phase))
   assert.equal(calls.length, 4)
-  assert.match(calls[2].input, /3: V1="\\"C\\"c2 e2 d2".*<- V1: 6 eighths, needs 8/)
-  assert.deepEqual(events, ['planning', 'plan', 'writing', 'repair', 'section', 'writing', 'section', 'done'])
+  assert.match(calls.find(c => c.instructions.startsWith('You fix bars')).input, /3: V1="\\"C\\"c2 e2 d2".*<- V1: 6 eighths, needs 8/)
+  assert.deepEqual(events, ['planning', 'plan', 'writing', 'repair', 'section', 'section', 'done'])
   assert.equal(piece.bars.length, 8)
   assert.equal(piece.bars[2].notes.V1, A[2].V1)
   assert.deepEqual(piece.marks.map(m => [m.kind, m.from, m.to]), [['section', 0, 3], ['fixed', 2, 2], ['section', 4, 7]])
@@ -148,4 +154,42 @@ test('spliceBars and withVersion keep the rest of the piece', () => {
   assert.equal(next.bars.length, 5)
   assert.equal(next.bars[3].notes.V1, A[2].V1)
   assert.equal(next.versions.length, 1)
+})
+
+test('a returning section reuses its bars instead of asking Hermes again', async () => {
+  const plan = { ...PLAN, sections: [...PLAN.sections, { id: 'A', name: 'Morning', bars: 4, chords: [], idea: 'return' }] }
+  const { ask, calls } = cannedAsk([plan, { bars: A }, { bars: B }])
+  const piece = await compose(ask, abcjs, 'a b a', () => {})
+  assert.equal(calls.length, 3)
+  assert.equal(piece.bars.length, 12)
+  assert.deepEqual(piece.bars.slice(8).map(b => b.notes.V1), A.map(b => b.V1))
+  assert.equal(piece.bars[8].section, 'A')
+  assert.deepEqual(piece.marks.map(m => [m.kind, m.from, m.text]), [['section', 0, 'A · morning'], ['section', 4, 'B · noon'], ['section', 8, 'A · morning, again']])
+})
+
+test('every new section is written in parallel straight after the plan', async () => {
+  const plan = { ...PLAN, sections: [...PLAN.sections, { id: 'C', name: 'Dusk', bars: 4, chords: [], idea: 'close' }] }
+  const started = []
+  let release
+  const gate = new Promise(r => { release = r })
+  const ask = async (instructions, input) => {
+    if (instructions.startsWith('You are the composer')) return JSON.stringify(plan)
+    const which = /Now write section (\w)/.exec(input)[1]
+    started.push(which)
+    if (started.length === 3) release()
+    await gate
+    return JSON.stringify({ bars: which === 'B' ? B : A })
+  }
+  const piece = await compose(ask, abcjs, 'abc', () => {})
+  assert.deepEqual(started, ['A', 'B', 'C'])
+  assert.equal(piece.bars.length, 12)
+})
+
+test('a bar edit sends only the bars around the selection', async () => {
+  const base = { ...pieceFromPlan(PLAN, 'x'), bars: Array.from({ length: 24 }, (_, i) => ({ section: 'A', notes: A[i % 4] })) }
+  const { ask, calls } = cannedAsk([{ bars: [{ V1: 'A8', V2: 'C,8' }], note: 'held' }])
+  await changeBars(ask, abcjs, base, 12, 12, 'hold it')
+  assert.match(calls[0].input, /Bars 9 to 17, around the selection/)
+  assert.doesNotMatch(calls[0].input, /^1: /m)
+  assert.match(calls[0].input, /^13: /m)
 })

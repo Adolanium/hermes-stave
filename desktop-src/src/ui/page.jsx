@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { changeBars, compose, reshape } from '../music/compose.js'
 import { instrumentOf, restoreVersion, toAbc } from '../music/model.js'
 import { makeAsk } from './ask.js'
+import { INBOX_EVENT } from './inbox.js'
 import { fmtTime, midiBytes, Player, barOfEvent } from './player.js'
 import { Sheet } from './sheet.jsx'
 import { deletePiece, loadPieces, savePiece, setCurrent, currentId } from './store.js'
@@ -202,19 +203,31 @@ export function StavePage({ storage }) {
   const [error, setError] = useState(null)
   const [draft, setDraft] = useState('')
   const [looping, setLooping] = useState(false)
-  const [useChatModel, setUseChatModel] = useState(() => storage.get('useChatModel', true) !== false)
-  const chatModelRef = useRef(useChatModel)
-  chatModelRef.current = useChatModel
   const cancelRef = useRef(false)
   const lastRequest = useRef(null)
   const inputRef = useRef(null)
   useClock(player)
 
-  const ask = useMemo(() => makeAsk(storage, { useChatModel: () => chatModelRef.current }), [storage])
+  const ask = useMemo(() => makeAsk(), [])
   const abc = useMemo(() => (piece && piece.bars.length ? toAbc(piece) : ''), [piece])
   const working = phase !== 'idle'
+  const workingRef = useRef(false)
+  workingRef.current = working
 
   const persist = useCallback(p => setPieces(savePiece(storage, p)), [storage])
+
+  // A piece the agent opened from a chat lands here: open it unless Hermes is mid-composition.
+  useEffect(() => {
+    const onInbox = e => {
+      const list = loadPieces(storage)
+      setPieces(list)
+      if (workingRef.current) return
+      const arrived = list.find(p => p.id === e.detail?.id)
+      if (arrived) openPiece(arrived)
+    }
+    window.addEventListener(INBOX_EVENT, onInbox)
+    return () => window.removeEventListener(INBOX_EVENT, onInbox)
+  })
 
   const openPiece = p => {
     player.stop()
@@ -247,8 +260,9 @@ export function StavePage({ storage }) {
           setProgress({ label: 'Planned', step: 1, total: ev.piece.sections.length + 1 })
         } else if (ev.phase === 'writing') {
           const s = ev.piece.sections.find(x => x.id === ev.section)
-          setWriting({ text: `writing ${s?.name ? s.name.toLowerCase() : `section ${ev.section}`}…` })
-          setProgress(p => ({ ...p, label: `Writing ${s?.name || `section ${ev.section}`}` }))
+          const label = ev.parallel > 1 ? 'the other sections' : s?.name ? s.name.toLowerCase() : `section ${ev.section}`
+          setWriting({ text: `writing ${label}…` })
+          setProgress(p => ({ ...p, label: `Writing ${label}` }))
         } else if (ev.phase === 'repair') {
           setWriting({ text: `checking bar${ev.bars.length > 1 ? 's' : ''} ${ev.bars.map(b => b + 1).join(', ')}…` })
         } else if (ev.phase === 'section') {
@@ -403,7 +417,7 @@ export function StavePage({ storage }) {
         <div className="st-tools">
           <PiecesMenu pieces={pieces} current={piece} disabled={working} onOpen={openPiece} onNew={() => openPiece(null)} onDelete={id => { setPieces(deletePiece(storage, id)); if (piece?.id === id) openPiece(null) }} />
           {abc && <button type="button" className="st-iconbtn" onClick={undo} disabled={!canUndo(piece) || working} title="Undo the last change (⌘Z)" aria-label="Undo the last change"><UndoIcon /></button>}
-          <ExportMenu piece={piece} player={player} abc={abc} useChatModel={useChatModel} onUseChatModel={v => { setUseChatModel(v); storage.set('useChatModel', v) }} onError={setError} />
+          <ExportMenu piece={piece} player={player} abc={abc} onError={setError} />
           {abc && <div className="st-transport">
             <button type="button" className="st-play" onClick={togglePlay} disabled={!abc || working} data-loading={player.isLoading ? 'true' : 'false'} aria-label={player.playing ? 'Pause' : 'Play'} title={player.playing ? 'Pause (Space)' : 'Play (Space)'}>
               <PlayGlyph playing={player.playing} />
@@ -573,7 +587,7 @@ function PiecesMenu({ pieces, current, disabled, onOpen, onNew, onDelete }) {
   )
 }
 
-function ExportMenu({ piece, player, abc, useChatModel, onUseChatModel, onError }) {
+function ExportMenu({ piece, player, abc, onError }) {
   const [open, setOpen] = useState(false)
   const ready = Boolean(piece && abc)
   const run = fn => async () => {
@@ -603,13 +617,7 @@ function ExportMenu({ piece, player, abc, useChatModel, onUseChatModel, onError 
           download(fileName(piece, 'abc'), new Blob([abc], { type: 'text/vnd.abc' }))
         })}><icons.FileText size={16} /> ABC notation<small>plain text</small></button>
         <button type="button" className="st-menu-item" disabled={!ready} onClick={run(async () => { await writeClipboardText(abc) })}><icons.Copy size={16} /> Copy ABC</button>
-        <div className="st-menu-head" style={{ paddingTop: 12 }}>Hermes writes with</div>
-        <button type="button" className="st-menu-item" aria-pressed={useChatModel} onClick={() => onUseChatModel(true)}>
-          {useChatModel ? <icons.Check size={16} /> : <span style={{ width: 16 }} />} Your chat model<small>best music</small>
-        </button>
-        <button type="button" className="st-menu-item" aria-pressed={!useChatModel} onClick={() => onUseChatModel(false)}>
-          {!useChatModel ? <icons.Check size={16} /> : <span style={{ width: 16 }} />} The fast helper model<small>cheaper</small>
-        </button>
+        <div className="st-menu-note">The model that writes the music is <b>Stave composer</b> in Settings ▸ Models. A fast model keeps edits quick.</div>
       </PopoverContent>
     </Popover>
   )

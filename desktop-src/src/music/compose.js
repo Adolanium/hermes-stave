@@ -28,10 +28,25 @@ async function checkAndRepair(ask, piece, abcjs, scope, emit) {
   return { piece: repaired, fixed: bad.filter(b => !still.includes(b)), left: issues }
 }
 
+/** Write one section after `context` (the bars it should answer), check it and repair it once. */
+async function writeChecked(ask, abcjs, context, section, emit) {
+  const bars = await writeSection(ask, context, section)
+  const from = context.bars.length
+  let draft = { ...context, bars: [...context.bars, ...bars.map(b => ({ section: section.id, notes: b.notes }))] }
+  const scope = bars.map((_, k) => from + k)
+  const checked = await checkAndRepair(ask, draft, abcjs, scope, emit)
+  draft = checked.piece
+  return { bars: draft.bars.slice(from), fixed: checked.fixed.map(b => b - from) }
+}
+
 /**
  * Compose a piece from a sentence. `emit(event)` receives:
- * plan → { piece } once the plan is in; section → { piece, from, to } as each section lands;
- * repair → { bars }; done → { piece, issues }.
+ * plan → { piece } once the plan is in; section → { piece, from, to } as each section lands, in form
+ * order; repair → { bars }; done → { piece, issues }.
+ *
+ * Speed: every new section is written in parallel straight after the plan, and a returning section
+ * (the second A of A B A) reuses the bars already written instead of asking again. A piece takes
+ * one plan call plus the slowest section.
  */
 export async function compose(ask, abcjs, prompt, emit = () => {}, cancelled = () => false) {
   emit({ phase: 'planning' })
@@ -39,22 +54,30 @@ export async function compose(ask, abcjs, prompt, emit = () => {}, cancelled = (
   let piece = pieceFromPlan(plan, prompt)
   if (piece.sections.length === 0) throw new Error('Hermes returned a plan with no sections')
   emit({ phase: 'plan', piece })
+
+  // Every new section starts at once: the plan already gives each its chords, character and
+  // relation to the others, so none waits for another's notes.
+  const jobs = new Map()
+  for (const section of piece.sections) {
+    if (!jobs.has(section.id)) jobs.set(section.id, writeChecked(ask, abcjs, piece, section, emit))
+  }
+  emit({ phase: 'writing', section: piece.sections[0].id, piece, parallel: jobs.size })
+
+  const seen = new Set()
   for (const section of piece.sections) {
     if (cancelled()) throw new Error('cancelled')
-    emit({ phase: 'writing', section: section.id, piece })
+    const repeat = seen.has(section.id)
+    seen.add(section.id)
+    const done = await jobs.get(section.id)
+    const bars = done.bars.slice(0, section.bars).map(b => ({ section: section.id, notes: { ...b.notes } }))
     const from = piece.bars.length
-    const bars = await writeSection(ask, piece, section)
-    piece = { ...piece, bars: [...piece.bars, ...bars.map(b => ({ section: section.id, notes: b.notes }))] }
+    piece = { ...piece, bars: [...piece.bars, ...bars] }
     const to = piece.bars.length - 1
-    const scope = Array.from({ length: to - from + 1 }, (_, k) => from + k)
-    const checked = await checkAndRepair(ask, piece, abcjs, scope, emit)
-    piece = checked.piece
-    const text = section.name ? `${section.id} · ${section.name.toLowerCase()}` : `section ${section.id}`
-    piece = { ...piece, marks: [...piece.marks, mark('section', from, to, text)] }
-    if (checked.fixed.length) {
-      piece = { ...piece, marks: [...piece.marks, ...checked.fixed.map(b => mark('fixed', b, b, 'checked and fixed'))] }
-    }
-    emit({ phase: 'section', piece, from, to, fixed: checked.fixed })
+    const name = section.name ? `${section.id} · ${section.name.toLowerCase()}` : `section ${section.id}`
+    const marks = [mark('section', from, to, repeat ? `${name}, again` : name)]
+    if (!repeat) marks.push(...done.fixed.filter(b => b < bars.length).map(b => mark('fixed', from + b, from + b, 'checked and fixed')))
+    piece = { ...piece, marks: [...piece.marks, ...marks] }
+    emit({ phase: 'section', piece, from, to, fixed: repeat ? [] : done.fixed, repeat })
   }
   piece = withVersion({ ...piece, updatedAt: Date.now() }, 'Written')
   const issues = checkPiece(piece, abcjs, toAbc(piece))

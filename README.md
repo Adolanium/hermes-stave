@@ -65,6 +65,10 @@ Press play or Space. Each instrument plays with its own sampled voice: music box
 
 Click a bar, drag across several, or Shift-click, then say what you want: *sadder*, *end on a long note*, *simpler bass*, *more like a question*. Hermes rewrites only those bars, boxes them in pencil, and writes what it changed in the margin. With nothing selected, a request applies to the whole piece: *slower*, *on strings*, *in A minor*, *make it longer*.
 
+### *Attacca* · or ask from any chat
+
+Stave also gives Hermes the craft itself. In any conversation, say *"write me a lullaby for my daughter and put it in Stave"*. The agent loads the **`stave:compose`** skill (the notation rules and how to shape a short piece), writes the bars, and checks them with **`stave_check`**, the same bar-length, range and syntax checks the page runs. Then **`stave_open`** puts the piece on the Stave page. `stave_open` refuses music with problems and hands back the list, so the agent fixes its own bars before you ever see them. A toast tells you the piece is ready, with a button to open it.
+
 ### *Da capo* · nothing is lost
 
 Every change keeps a snapshot. Undo with the arrow or ⌘Z / Ctrl+Z and you are back where you were. Your pieces stay in the Pieces menu.
@@ -89,7 +93,9 @@ hermes plugins install https://github.com/Adolanium/hermes-stave
 
 Enable **Stave** in Capabilities → Plugins. It appears in the sidebar and as *Open Stave* in the command palette (⌘K).
 
-**Which model writes the music.** By default Stave uses your chat model, which writes the most musical pieces. The export menu can switch it to Hermes's faster helper model, which costs less. A 24-bar piece takes about 40 seconds on a fast model.
+**Which model writes the music.** Stave registers its own task, **Stave composer**, in Settings → Models. With nothing set there, Hermes uses your main model. A fast model keeps writing and edits quick; a stronger one writes better melodies.
+
+**How it stays quick.** Hermes writes the opening section first, because it sets the motif. Every other new section is then written at the same time, and a returning section (the second *A* of *A B A*) reuses the bars already written instead of asking again. An edit sends only the bars around your selection.
 
 ### Building from source
 
@@ -110,8 +116,8 @@ ln -s "$PWD/desktop" ~/.hermes/desktop-plugins/stave
 
 What Stave does on your machine, in full:
 
-- **Model calls.** Every step is one stateless `llm.oneshot` request through Hermes: one to plan, one per section, one per repair, one per change. Nothing runs in the gateway and no agent tools are added.
-- **One hidden session.** With "your chat model" selected, Stave creates one hidden Hermes session titled *Stave* so a one-shot request can borrow that session's model. Hermes does not let plugins delete sessions; you can remove it from the session list.
+- **Model calls.** The page makes one stateless `llm.oneshot` request per step (plan, each new section, each repair, each change) through its **Stave composer** task. It creates no sessions.
+- **Agent tools.** `stave_check` reads the piece it is given and returns problems; it touches nothing. `stave_open` writes one JSON file per piece to `~/.hermes/plugin-data/stave/inbox/`; the page reads it through the plugin's route at `/api/plugins/stave/inbox`, saves the piece and deletes the file.
 - **Network.** Playback downloads instrument samples from `paulrosen.github.io/midi-js-soundfonts` the first time each instrument plays. Nothing else leaves your machine except the model calls you already route through Hermes.
 - **Storage.** Pieces, their undo history and your model choice live in the plugin's own Desktop storage. Stave writes no files unless you export one.
 - **Sound.** Audio plays only when you press play. Stave never uses the microphone.

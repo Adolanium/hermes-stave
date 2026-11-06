@@ -1,0 +1,9 @@
+{
+  "name": "stave",
+  "label": "Stave",
+  "description": "Pieces the agent opened for the Stave page in Hermes Desktop",
+  "icon": "Music",
+  "tab": { "path": "/stave", "hidden": true },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}

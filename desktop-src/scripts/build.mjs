@@ -17,6 +17,7 @@ await build({
   jsx: 'automatic',
   target: 'es2022',
   minify: true,
+  minifyIdentifiers: process.env.READABLE ? false : true,
   legalComments: 'eof',
   external: ['react', 'react/jsx-runtime', '@hermes/plugin-sdk'],
   loader: { '.woff2': 'dataurl' },
