@@ -9,14 +9,14 @@ function mark(kind, from, to, text) {
 }
 
 /** Check bars, repair the broken ones once, and return { piece, fixed, left }. */
-async function checkAndRepair(ask, piece, abcjs, scope, emit) {
+async function checkAndRepair(ask, piece, abcjs, scope, emit, intent = '') {
   let issues = checkPiece(piece, abcjs, toAbc(piece)).filter(i => i.bar < 0 || scope.includes(i.bar))
   let bad = badBars(issues)
   if (bad.length === 0) return { piece, fixed: [], left: issues.filter(i => i.bar < 0) }
   emit({ phase: 'repair', bars: bad, issues })
   let repaired = piece
   try {
-    const bars = await repairBars(ask, piece, bad, issues)
+    const bars = await repairBars(ask, piece, bad, issues, intent)
     const nextBars = [...piece.bars]
     bad.forEach((index, k) => { nextBars[index] = { ...nextBars[index], notes: bars[k].notes } })
     repaired = { ...piece, bars: nextBars }
@@ -92,15 +92,45 @@ export async function compose(ask, abcjs, prompt, emit = () => {}, cancelled = (
   return piece
 }
 
+/** What a bar sounds like, ignoring how it is spelled: chord symbols, spacing and decorations dropped. */
+function sound(text) {
+  return String(text || '').replace(/"[^"]*"/g, '').replace(/![^!]*!/g, '').replace(/\s+/g, '')
+}
+
+function sameBars(piece, from, bars) {
+  return bars.every((b, k) => piece.voices.every(v => sound(b.notes[v.id]) === sound(piece.bars[from + k]?.notes[v.id])))
+}
+
 /** Change bars [from, to] as asked. Returns the new piece (with an undo snapshot) and Hermes's note. */
 export async function changeBars(ask, abcjs, piece, from, to, request, emit = () => {}) {
   emit({ phase: 'editing', from, to })
   const before = withVersion(piece, `Before: ${request.slice(0, 40)}`)
-  const { bars, note } = await editBars(ask, piece, from, to, request)
-  let next = spliceBars(before, from, to, bars)
   const scope = Array.from({ length: to - from + 1 }, (_, k) => from + k)
-  const checked = await checkAndRepair(ask, next, abcjs, scope, emit)
-  next = checked.piece
+  const problemsIn = bars => {
+    const draft = spliceBars(before, from, to, bars)
+    return checkPiece(draft, abcjs, toAbc(draft)).filter(i => scope.includes(i.bar))
+  }
+  let { bars, note } = await editBars(ask, piece, from, to, request)
+  // One more try, with the edit prompt, when the reply hands the same notes back or breaks the bar:
+  // a generic repair tends to undo the change the person asked for.
+  let retry = ''
+  if (sameBars(piece, from, bars)) {
+    retry = 'Your last answer returned these bars unchanged. Change the notes this time: rhythm, pitches or both.'
+  } else {
+    const problems = problemsIn(bars)
+    if (problems.length) {
+      const lines = problems.map(i => `bar ${i.bar + 1} ${i.voice}: ${i.message}`).join('\n')
+      retry = `Your last answer was ${JSON.stringify({ bars: bars.map(b => b.notes) })} but it has problems:\n${lines}\nKeep the idea and make every bar add up: to hold a note longer, shorten or drop the notes before it.`
+    }
+  }
+  if (retry) {
+    emit({ phase: 'retry', from, to })
+    ;({ bars, note } = await editBars(ask, piece, from, to, request, retry))
+  }
+  let next = spliceBars(before, from, to, bars)
+  next = (await checkAndRepair(ask, next, abcjs, scope, emit, request)).piece
+  // The notes can still land back where they started; say so rather than claim a change.
+  if (sameBars(piece, from, next.bars.slice(from, to + 1))) note = 'Hermes kept these bars as they were. Try asking another way.'
   next = { ...next, marks: [...next.marks.filter(m => m.to < from || m.from > to || m.kind === 'section'), mark('changed', from, to, note || request)] }
   return { piece: next, note }
 }

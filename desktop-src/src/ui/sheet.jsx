@@ -292,7 +292,7 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
         Object.assign(div.style, { left: `${b.x + pad}px`, top: `${top}px`, width: `${b.w - pad * 2}px`, height: `${b.y + b.h - pad - top}px` })
         overlay.appendChild(div)
         if (m.kind === 'piece') return writeNote(m, b, j, k, div)
-        const type = m.kind === 'section' ? 'bracket' : m.kind === 'fixed' ? 'circle' : 'box'
+        const type = m.kind === 'section' ? 'bracket' : m.kind === 'fixed' ? 'underline' : 'box'
         const a = annotate(div, {
           type,
           brackets: ['top'],

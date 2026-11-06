@@ -206,3 +206,37 @@ test('a section that fails once is asked again instead of losing the piece', asy
   assert.ok(events.includes('retry'))
   assert.equal(piece.bars.length, 8)
 })
+
+test('an edit that returns the same notes is asked again, and never claims a change it did not make', async () => {
+  const base = { ...pieceFromPlan(PLAN, 'x'), bars: A.map(n => ({ section: 'A', notes: n })) }
+  const same = { bars: [{ V1: A[3].V1, V2: A[3].V2 }], note: 'made it sleepy' }
+  const { ask, calls } = cannedAsk([same, { bars: [{ V1: '"G"B8', V2: 'G,,8' }], note: 'held the last note' }])
+  const { piece, note } = await changeBars(ask, abcjs, base, 3, 3, 'end on a long note')
+  assert.equal(calls.length, 2)
+  assert.match(calls[1].input, /returned these bars unchanged/)
+  assert.equal(piece.bars[3].notes.V1, '"G"B8')
+  assert.equal(note, 'held the last note')
+
+  const stubborn = cannedAsk([same, same])
+  const second = await changeBars(stubborn.ask, abcjs, base, 3, 3, 'end on a long note')
+  assert.equal(second.note, 'Hermes kept these bars as they were. Try asking another way.')
+  assert.equal(second.piece.marks.at(-1).text, second.note)
+})
+
+test('an edit that overruns the bar goes back to the edit prompt, and a repair back to the start says so', async () => {
+  const base = { ...pieceFromPlan(PLAN, 'x'), bars: A.map(n => ({ section: 'A', notes: n })) }
+  const long = { bars: [{ V1: '"G"B6 A4', V2: A[3].V2 }], note: 'held the last note' }
+  const { ask, calls } = cannedAsk([long, { bars: [{ V1: '"G"B4 A4', V2: A[3].V2 }], note: 'held the last note' }])
+  const { piece, note } = await changeBars(ask, abcjs, base, 3, 3, 'end on a long note')
+  assert.equal(calls.length, 2)
+  assert.match(calls[1].instructions, /^You revise a short piece/)
+  assert.match(calls[1].input, /has problems/)
+  assert.equal(piece.bars[3].notes.V1, '"G"B4 A4')
+  assert.equal(note, 'held the last note')
+
+  const stubborn = cannedAsk([long, long, { bars: [{ V1: A[3].V1, V2: A[3].V2 }] }])
+  const second = await changeBars(stubborn.ask, abcjs, base, 3, 3, 'end on a long note')
+  assert.equal(stubborn.calls.length, 3)
+  assert.match(stubborn.calls[2].input, /the person asked: end on a long note/)
+  assert.equal(second.note, 'Hermes kept these bars as they were. Try asking another way.')
+})

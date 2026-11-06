@@ -40,7 +40,7 @@ ${NOTATION_RULES(meter)}`
 
 export const EDIT_INSTRUCTIONS = (meter) => `You revise a short piece of ABC music for Stave. The person selected some bars and said how to change them.
 Reply with JSON only: {"bars": [{"V1": "...", "V2": "..."}, ...], "note": "what you changed, under 12 words, plain words for someone who does not read music"}
-Return exactly the number of bars selected, one object per bar, every voice. Keep the bars around the selection in mind so the change joins smoothly.
+Return exactly the number of bars selected, one object per bar, every voice. The notes must actually change to do what they asked: a new rhythm, new pitches or both. The bar length never changes: to hold a note longer, take its time from other notes in the bar (shorten or drop them). Keep the bars around the selection in mind so the change joins smoothly.
 ${NOTATION_RULES(meter)}`
 
 export const RESHAPE_INSTRUCTIONS = (meter) => `You revise a whole short piece of ABC music for Stave. The person said how to change it.
@@ -98,12 +98,13 @@ export async function writeSection(ask, piece, section) {
 }
 
 /** Ask Hermes to fix bars `indexes` (0-based) given their issues; returns bars in the same order. */
-export async function repairBars(ask, piece, indexes, issues) {
+export async function repairBars(ask, piece, indexes, issues, intent = '') {
   const rows = indexes.map(i => {
     const problems = issues.filter(x => x.bar === i).map(x => `${x.voice}: ${x.message}`).join('; ')
     return `${barsText(piece, i, i)}   <- ${problems}`
   })
-  const input = `${describe(piece)}\n\nWhole piece for context:\n${barsText(piece)}\n\nFix these ${indexes.length} bars, in this order:\n${rows.join('\n')}`
+  const keep = intent ? `\n\nThese bars were just rewritten because the person asked: ${intent}. Keep that change and fix only the problems: to make a note longer, take the time from the notes around it.` : ''
+  const input = `${describe(piece)}\n\nWhole piece for context:\n${barsText(piece)}\n\nFix these ${indexes.length} bars, in this order:\n${rows.join('\n')}${keep}`
   const text = await ask(REPAIR_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: replyBudget(piece, indexes.length), temperature: 0.2 })
   return readBars(parseJson(text), piece, indexes.length)
 }
@@ -122,13 +123,13 @@ export function replyBudget(piece, bars) {
  * Only the neighbourhood travels (four bars either side, plus the form): a smaller prompt and a
  * reply sized to the selection keep a bar edit quick.
  */
-export async function editBars(ask, piece, from, to, request) {
+export async function editBars(ask, piece, from, to, request, retryNote = '') {
   const count = to - from + 1
   const lo = Math.max(0, from - 4)
   const hi = Math.min(piece.bars.length - 1, to + 4)
   const form = piece.sections.map(s => `${s.id} "${s.name}"`).join(', ')
-  const input = `${describe(piece)}\nForm: ${form}; ${piece.bars.length} bars in all.\n\nBars ${lo + 1} to ${hi + 1}, around the selection:\n${barsText(piece, lo, hi)}\n\nSelected: bars ${from + 1} to ${to + 1} (${count} bars).\nThe person said: ${request}`
-  const text = await ask(EDIT_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: replyBudget(piece, count) + 60, temperature: 0.6 })
+  const input = `${describe(piece)}\nForm: ${form}; ${piece.bars.length} bars in all.\n\nBars ${lo + 1} to ${hi + 1}, around the selection:\n${barsText(piece, lo, hi)}\n\nSelected: bars ${from + 1} to ${to + 1} (${count} bars).\nThe person said: ${request}${retryNote ? `\n\n${retryNote}` : ''}`
+  const text = await ask(EDIT_INSTRUCTIONS(piece.meta.meter), input, { maxTokens: replyBudget(piece, count) + 60, temperature: retryNote ? 0.9 : 0.6 })
   const reply = parseJson(text)
   return { bars: readBars(reply, piece, count), note: String(reply.note || '').slice(0, 120) }
 }
