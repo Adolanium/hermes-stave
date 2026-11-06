@@ -62,6 +62,39 @@ export function foldIntoRange(text, [low, high]) {
     .join('')
 }
 
+const SHARP_ORDER = 'FCGDAEB'
+const FLAT_ORDER = 'BEADGCF'
+const MAJOR_FIFTHS = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7, F: -1, Bb: -2, Eb: -3, Ab: -4, Db: -5, Gb: -6, Cb: -7 }
+const MINOR_FIFTHS = { A: 0, E: 1, B: 2, 'F#': 3, 'C#': 4, 'G#': 5, 'D#': 6, 'A#': 7, D: -1, G: -2, C: -3, F: -4, Bb: -5, Eb: -6, Ab: -7 }
+const ACCIDENTAL_VALUE = { '^': 1, '^^': 2, _: -1, __: -2, '=': 0 }
+
+/** Sharps (+1) and flats (-1) by letter for a key like "G", "Bb" or "F#m". */
+export function keyAccidentals(key) {
+  const k = String(key || 'C')
+  const fifths = (k.endsWith('m') ? MINOR_FIFTHS[k.slice(0, -1)] : MAJOR_FIFTHS[k]) ?? 0
+  return Object.fromEntries([...(fifths >= 0 ? SHARP_ORDER : FLAT_ORDER).slice(0, Math.abs(fifths))].map(l => [l, fifths >= 0 ? 1 : -1]))
+}
+
+/**
+ * Drop accidentals the key signature already gives, so a D chord in G major does not print a sharp
+ * on its F. An accidental that matches the key is dropped until one that changes the note appears on
+ * that letter in the bar; from then on everything on that letter is kept as written.
+ */
+export function dropKeyAccidentals(text, key) {
+  const keyAcc = keyAccidentals(key)
+  const touched = new Set()
+  return String(text ?? '')
+    .split(/("[^"]*"|![^!]*!)/)
+    .map((part, i) => (i % 2 ? part : part.replace(/(\^\^|__|[_^=])?([A-Ga-g])/g, (whole, acc, letter) => {
+      if (!acc) return whole
+      const name = letter.toUpperCase()
+      if (!touched.has(name) && ACCIDENTAL_VALUE[acc] === (keyAcc[name] ?? 0)) return letter
+      touched.add(name)
+      return whole
+    })))
+    .join('')
+}
+
 /** The clef a voice must use: fretted instruments have a fixed one; others keep what Hermes chose. */
 export function clefFor(instrument, clef) {
   const tab = INSTRUMENTS[String(instrument || '').toLowerCase()]?.tab

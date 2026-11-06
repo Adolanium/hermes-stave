@@ -173,3 +173,12 @@ def test_out_of_range_guitar_notes_move_by_octaves_like_the_page():
     piece = tools._normalise({"voices": [{"id": "V1", "instrument": "steel guitar"}, {"id": "V2", "instrument": "flute"}],
                               "bars": [{"section": "A", "V1": "D,4 D,4", "V2": "D,4 D,4"}]})
     assert piece["bars"][0]["notes"] == {"V1": "D4 D4", "V2": "D,4 D,4"}
+
+
+def test_accidentals_the_key_gives_are_dropped_like_the_page():
+    assert abc_check.drop_key_accidentals('"D"[DAd^f]2 ^F2 =C2', "G") == '"D"[DAdf]2 F2 C2'
+    assert abc_check.drop_key_accidentals("=F2 ^F2 ^G2 _B2", "G") == "=F2 ^F2 ^G2 _B2"
+    assert abc_check.drop_key_accidentals('"Bb"_B2 _e2 =A2 ^c2', "Bb") == '"Bb"B2 e2 A2 ^c2'
+    piece = tools._normalise({"key": "G", "voices": [{"id": "V1", "instrument": "steel guitar"}],
+                              "bars": [{"section": "A", "V1": "[DAd^f]4 [DAd^f]4"}]})
+    assert piece["bars"][0]["notes"]["V1"] == "[DAdf]4 [DAdf]4"

@@ -365,7 +365,8 @@ export function StavePage({ storage }) {
   }, [looping, selection?.from, selection?.to, abc, player.duration])
 
   const position = player.position()
-  const event = player.playing ? player.eventAt(position) : null
+  // Playing, the label follows the music; paused, a selection wins, then wherever playback stopped.
+  const event = player.playing || (!selection && position > 0) ? player.eventAt(position) : null
   const bar = event ? barOfEvent(event) : -1
 
   const placeholder = !piece

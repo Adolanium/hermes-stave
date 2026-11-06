@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import { badBars, checkPiece, chordFitsStrings, lintBar } from '../src/music/check.js'
 import { changeBars, compose, reshape } from '../src/music/compose.js'
 import { parseJson, readBars } from '../src/music/hermes.js'
-import { FRETTED_RANGE, barLength, clefFor, foldIntoRange, pieceFromPlan, restoreVersion, sectionRanges, spliceBars, tablatureFor, toAbc, withVersion } from '../src/music/model.js'
+import { FRETTED_RANGE, barLength, clefFor, dropKeyAccidentals, foldIntoRange, keyAccidentals, pieceFromPlan, restoreVersion, sectionRanges, spliceBars, tablatureFor, toAbc, withVersion } from '../src/music/model.js'
 
 const abcjs = createRequire(import.meta.url)('abcjs')
 
@@ -348,4 +348,17 @@ test('notes beyond a guitar part are moved by octaves into it, as a player would
   const piece = pieceFromPlan({ ...PLAN, voices: [{ name: 'Guitar', instrument: 'steel guitar' }, { name: 'Flute', instrument: 'flute' }] })
   const [bar] = readBars({ bars: [{ V1: 'D,4 D,4', V2: 'D,4 D,4' }] }, piece, 1)
   assert.deepEqual(bar.notes, { V1: 'D4 D4', V2: 'D,4 D,4' })
+})
+
+test('accidentals the key already gives are dropped, others kept as written', () => {
+  assert.deepEqual(keyAccidentals('G'), { F: 1 })
+  assert.deepEqual(keyAccidentals('Dm'), { B: -1 })
+  assert.deepEqual(keyAccidentals('Eb'), { B: -1, E: -1, A: -1 })
+  assert.equal(dropKeyAccidentals('"D"[DAd^f]2 ^F2 =C2', 'G'), '"D"[DAdf]2 F2 C2')
+  // After a natural on F, a later sharp is needed and stays; so do accidentals outside the key.
+  assert.equal(dropKeyAccidentals('=F2 ^F2 ^G2 _B2', 'G'), '=F2 ^F2 ^G2 _B2')
+  assert.equal(dropKeyAccidentals('"Bb"_B2 _e2 =A2 ^c2', 'Bb'), '"Bb"B2 e2 A2 ^c2')
+  const piece = { ...pieceFromPlan({ ...PLAN, key: 'G' }), bars: [] }
+  const [bar] = readBars({ bars: [{ V1: '"D"^f2 a2 d4', V2: '^F,8' }] }, piece, 1)
+  assert.deepEqual(bar.notes, { V1: '"D"f2 a2 d4', V2: 'F,8' })
 })

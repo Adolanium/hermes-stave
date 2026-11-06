@@ -53,6 +53,26 @@ def fold_into_range(text, low, high) -> str:
     return "".join(part if i % 2 else re.sub(r"([_^=]*)([A-Ga-g])([,']*)", fix, part) for i, part in enumerate(parts))
 
 
+def drop_key_accidentals(text, key) -> str:
+    """Drop accidentals the key signature already gives (no sharp on F in a G major D chord), until one
+    that changes the note appears on that letter in the bar. Same as the page's dropKeyAccidentals."""
+    keyacc = key_accidentals(key)
+    touched = set()
+
+    def fix(m):
+        acc, letter = m.group(1), m.group(2)
+        if not acc:
+            return m.group(0)
+        name = letter.upper()
+        if name not in touched and _ACC.get(acc, 0) == keyacc.get(name, 0):
+            return letter
+        touched.add(name)
+        return m.group(0)
+
+    parts = re.split(r'("[^"]*"|![^!]*!)', str(text or ""))
+    return "".join(part if i % 2 else re.sub(r"(\^\^|__|[_^=])?([A-Ga-g])", fix, part) for i, part in enumerate(parts))
+
+
 def clef_for(instrument, clef) -> str:
     """The clef a voice must use: fixed for fretted instruments, the writer's choice otherwise."""
     fretted = FRETTED.get(str(instrument or "").lower())
