@@ -246,7 +246,7 @@ export function StavePage({ storage }) {
         const before = piece
         const { piece: next, note } = await reshape(ask, abcjs, piece, text)
         const rewrote = next.bars !== before.bars
-        const marked = { ...next, marks: [...next.marks, { kind: 'changed', from: 0, to: Math.min(3, next.bars.length - 1), text: note, at: Date.now() }] }
+        const marked = { ...next, marks: [...next.marks.filter(m => m.kind !== 'piece'), { kind: 'piece', from: 0, to: 0, text: note, at: Date.now() }] }
         setPiece(marked)
         persist(marked)
         if (rewrote) setSlither({ from: 0, to: next.bars.length - 1, key: Date.now() })
@@ -306,6 +306,16 @@ export function StavePage({ storage }) {
     if (selection) inputRef.current?.focus()
   }, [selection?.from, selection?.to])
 
+  // While Hermes composes, keep the newest section and the pencil in view.
+  const bodyRef = useRef(null)
+  useEffect(() => {
+    if (phase !== 'composing' || !slither) return
+    const el = bodyRef.current
+    if (!el) return
+    const id = requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion() ? 'auto' : 'smooth' }))
+    return () => cancelAnimationFrame(id)
+  }, [slither?.key])
+
   const position = player.position()
   const event = player.playing ? player.eventAt(position) : null
   const bar = event ? barOfEvent(event) : -1
@@ -326,7 +336,7 @@ export function StavePage({ storage }) {
               <>
                 <b>{keyName(piece.meta.key)}</b><span className="st-dot" />
                 <span>{piece.meta.meter}</span><span className="st-dot" />
-                <span>♩ = {piece.meta.tempo}</span><span className="st-dot" />
+                <span>{piece.meta.meter === '6/8' ? '♩.' : '♩'} = {piece.meta.tempo}</span><span className="st-dot" />
                 <span>{piece.voices.map(v => instrumentOf(v.instrument).label).join(', ')}</span>
                 {piece.bars.length > 0 && (<><span className="st-dot" /><span>{piece.bars.length} bars</span></>)}
               </>
@@ -357,7 +367,7 @@ export function StavePage({ storage }) {
         </div>
       </header>
 
-      <main className="st-body">
+      <main className="st-body" ref={bodyRef}>
         {piece && piece.bars.length > 0 ? (
           <Sheet
             abc={abc}

@@ -283,6 +283,7 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
         const top = m.kind === 'section' ? Math.min(b.y + 6, b.ink - 8) : b.y + pad
         Object.assign(div.style, { left: `${b.x + pad}px`, top: `${top}px`, width: `${b.w - pad * 2}px`, height: `${b.y + b.h - pad - top}px` })
         overlay.appendChild(div)
+        if (m.kind === 'piece') return writeNote(m, b, j, k, div)
         const type = m.kind === 'section' ? 'bracket' : m.kind === 'fixed' ? 'circle' : 'box'
         const a = annotate(div, {
           type,
@@ -296,6 +297,9 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
         })
         a.show()
         annotations.push(a)
+        writeNote(m, b, j, k)
+      })
+      function writeNote(m, b, j, k) {
         if (j === 0 && m.text) {
           const note = document.createElement('div')
           note.className = 'st-note'
@@ -308,7 +312,7 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
           note.textContent = m.text
           overlay.appendChild(note)
         }
-      })
+      }
     })
     return () => annotations.forEach(a => a.remove())
   }, [boxes, marks])
@@ -431,8 +435,10 @@ export function Sheet({ abc, barCount, marks, selection, busy, slither, writing,
 }
 
 function WritingMark({ boxes, text }) {
+  // Where the next system will start: under the last one, at the left margin.
   const last = boxes[boxes.length - 1]
-  const style = last ? { left: Math.min(last.x + last.w + 18, 99999), top: last.y + last.h / 2 - 12 } : { left: 8, top: 8 }
+  const lineStart = last ? boxes.find(b => b.line === last.line) : null
+  const style = last ? { left: lineStart.x + 8, top: last.y + last.h + 34 } : { left: 8, top: 8 }
   return (
     <div className="st-writing" style={style} aria-live="polite">
       <span>{text}</span>
