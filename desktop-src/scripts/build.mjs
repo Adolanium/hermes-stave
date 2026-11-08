@@ -36,7 +36,7 @@ await build({
   legalComments: 'eof',
   external: ['react', 'react/jsx-runtime', '@hermes/plugin-sdk'],
   loader: { '.woff2': 'dataurl' },
-  banner: { js: `// Stave ${version} — built from desktop-src/ (npm ci && npm run build). Do not edit.` },
+  banner: { js: `// Stave ${version} — built from desktop-src/ (npm ci && npm run build). Do not edit. Bundles abcjs (MIT, Paul Rosen and Gregory Dyke), Rough Notation (MIT, Preet Shihn) and the Bodoni Moda and Kalam fonts (SIL OFL 1.1); licenses in THIRD_PARTY_NOTICES.md.` },
   plugins: [ABCJS_TAB_FIX],
   logLevel: 'warning'
 })

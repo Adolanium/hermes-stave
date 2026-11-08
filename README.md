@@ -108,7 +108,7 @@ npm run build    # writes desktop/plugin.js
 npm test
 ```
 
-To work on it live, link the `desktop/` folder into Hermes Desktop. Every build reloads the page:
+To work on the page live, link only the `desktop/` folder into Hermes Desktop instead of installing the plugin (with both, the page loads twice). Every build reloads the page. The agent tools and the `stave:compose` skill need the full install:
 
 ```bash
 ln -s "$PWD/desktop" ~/.hermes/desktop-plugins/stave
@@ -133,6 +133,6 @@ Stave stands on the work of others:
 - [**Bodoni Moda**](https://github.com/indestructible-type/Bodoni) and [**Kalam**](https://github.com/itfoundry/kalam) (SIL Open Font License 1.1) set the titles and the handwriting.
 - The instrument samples are the **FluidR3 GM** soundfont, converted by [midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts).
 
-Released under the [MIT License](LICENSE).
+Their licenses are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Stave itself is released under the [MIT License](LICENSE).
 
 <p align="center"><sub><i>Fine.</i></sub></p>
